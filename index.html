@@ -4,54 +4,125 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Portfolio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron&family=Roboto&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        * {
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
+            box-sizing: border-box;
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: 'Tahoma', sans-serif;
+            background-color: #0f0f0f;
+            color: #f4f4f4;
             text-align: center;
         }
         header {
-            background: #333;
-            color: white;
-            padding: 15px;
+            background: #1f1f1f;
+            color: #00ffc8;
+            padding: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        nav a {
+            margin: 0 15px;
+            color: #00ffc8;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.3s;
+        }
+        nav a:hover {
+            color: #ffffff;
         }
         section {
-            margin: 20px;
-            padding: 20px;
-            background: white;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            border-radius: 5px;
+            margin: 40px 20px;
+            padding: 40px 20px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 255, 200, 0.1);
+            transition: transform 0.3s;
+        }
+        section:hover {
+            transform: scale(1.02);
         }
         footer {
-            background: #333;
-            color: white;
-            padding: 10px;
+            background: #1f1f1f;
+            color: #777;
+            padding: 15px;
             position: fixed;
             bottom: 0;
             width: 100%;
+        }
+        .typewriter {
+            font-family: 'Tahoma';
+            overflow: hidden;
+            border-right: .15em solid #00ffc8;
+            white-space: nowrap;
+            margin: 0 auto;
+            letter-spacing: .1em;
+            animation: typing 3s steps(40, end), blink-caret 0.75s step-end infinite;
+        }
+        @keyframes typing {
+            from { width: 0 }
+            to { width: 100% }
+        }
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: #00ffc8; }
+        }
+        form input, form textarea {
+            padding: 10px;
+            margin: 10px 0;
+            width: 80%;
+            border: none;
+            border-radius: 5px;
+        }
+        form button {
+            background-color: #00ffc8;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        form button:hover {
+            background-color: #00cfa0;
         }
     </style>
 </head>
 <body>
     <header>
-        <h1>My Portfolio</h1>
+        <h1 class="typewriter">My Portfolio</h1>
+        <nav>
+            <a href="#about">About</a>
+            <a href="#projects">Projects</a>
+            <a href="#contact">Contact</a>
+        </nav>
     </header>
-    <section>
-        <h2>sean pearce is a terror to the university</h2>
+
+    <section id="about">
+        <h2>Sean Pearce is a terror to the university</h2>
         <p>Hello! I'm a cybersecurity engineering student with a passion for programming and technology.</p>
     </section>
-    <section>
+
+    <section id="projects">
         <h2>Projects</h2>
-        
+        <p>(Soon to be filled with dangerously cool hacks and builds...)</p>
     </section>
-    <section>
+
+    <section id="contact">
         <h2>Contact</h2>
-        <p>Email: do not contact me</p>
+        <form>
+            do not contact me
+        </form>
     </section>
+
     <footer>
-        <p>&copy; 2025 richard tran 🫃</p>
+        <p>&copy; 2025 Richard Tran 🫃</p>
     </footer>
 </body>
 </html>
