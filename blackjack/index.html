@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Simple Blackjack</title>
+  <style>
+    body { font-family: Arial; text-align: center; margin-top: 50px; }
+    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Blackjack</h1>
+  <p>Credits: <span id="credits">100</span></p>
+  <p>Your Hand: <span id="player-hand"></span> (Total: <span id="player-total">0</span>)</p>
+  <p>Dealer's Hand: <span id="dealer-hand"></span> (Total: <span id="dealer-total">0</span>)</p>
+  <button onclick="startGame()">Start Game (-10 credits)</button>
+  <button onclick="hit()">Hit</button>
+  <button onclick="stand()">Stand</button>
+  <p id="message"></p>
+
+  <script>
+    let credits = 100;
+    let playerHand = [];
+    let dealerHand = [];
+    let deck = [];
+
+    function updateUI() {
+      document.getElementById("credits").textContent = credits;
+      document.getElementById("player-hand").textContent = playerHand.join(", ");
+      document.getElementById("dealer-hand").textContent = dealerHand.join(", ");
+      document.getElementById("player-total").textContent = getTotal(playerHand);
+      document.getElementById("dealer-total").textContent = getTotal(dealerHand);
+    }
+
+    function getCard() {
+      const cards = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11]; // face cards = 10, ace = 11
+      return cards[Math.floor(Math.random() * cards.length)];
+    }
+
+    function getTotal(hand) {
+      let total = hand.reduce((a, b) => a + b, 0);
+      let aces = hand.filter(card => card === 11).length;
+      while (total > 21 && aces > 0) {
+        total -= 10;
+        aces--;
+      }
+      return total;
+    }
+
+    function startGame() {
+      if (credits < 10) {
+        document.getElementById("message").textContent = "Not enough credits!";
+        return;
+      }
+      credits -= 10;
+      playerHand = [getCard(), getCard()];
+      dealerHand = [getCard(), getCard()];
+      document.getElementById("message").textContent = "";
+      updateUI();
+    }
+
+    function hit() {
+      if (playerHand.length === 0) return;
+      playerHand.push(getCard());
+      updateUI();
+      const total = getTotal(playerHand);
+      if (total > 21) {
+        document.getElementById("message").textContent = "Bust! You lose.";
+        playerHand = [];
+        dealerHand = [];
+      }
+    }
+
+    function stand() {
+      if (playerHand.length === 0) return;
+      while (getTotal(dealerHand) < 17) {
+        dealerHand.push(getCard());
+      }
+      const playerTotal = getTotal(playerHand);
+      const dealerTotal = getTotal(dealerHand);
+      let result = "";
+      if (dealerTotal > 21 || playerTotal > dealerTotal) {
+        result = "You win! +20 credits";
+        credits += 20;
+      } else if (playerTotal === dealerTotal) {
+        result = "Push! +10 credits";
+        credits += 10;
+      } else {
+        result = "Dealer wins!";
+      }
+      document.getElementById("message").textContent = result;
+      playerHand = [];
+      dealerHand = [];
+      updateUI();
+    }
+  </script>
+</body>
+</html>
