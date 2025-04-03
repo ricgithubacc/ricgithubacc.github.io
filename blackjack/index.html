@@ -3,27 +3,75 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Simple Blackjack</title>
+  <title>Blackjack</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
   <style>
-    body { font-family: Arial; text-align: center; margin-top: 50px; }
-    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
+    body {
+      font-family: 'Roboto Mono', monospace;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+    #game-area {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 16px;
+      padding: 20px;
+      margin: auto;
+      max-width: 400px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.6);
+    }
+    button {
+      margin: 10px 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background-color: #1abc9c;
+      color: white;
+      transition: background 0.3s ease;
+    }
+    button:hover {
+      background-color: #16a085;
+    }
+    input[type=number] {
+      width: 60px;
+      padding: 5px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: none;
+      text-align: center;
+    }
+    p {
+      font-size: 1.1rem;
+    }
   </style>
 </head>
 <body>
   <h1>Blackjack</h1>
-  <p>Credits: <span id="credits">100</span></p>
-  <p>Your Hand: <span id="player-hand"></span> (Total: <span id="player-total">0</span>)</p>
-  <p>Dealer's Hand: <span id="dealer-hand"></span> (Total: <span id="dealer-total">0</span>)</p>
-  <button onclick="startGame()">Start Game (-10 credits)</button>
-  <button onclick="hit()">Hit</button>
-  <button onclick="stand()">Stand</button>
-  <p id="message"></p>
+  <div id="game-area">
+    <p>Credits: <span id="credits">100</span></p>
+    <p>
+      Bet: <input type="number" id="bet" value="10" min="1" />
+      <button onclick="startGame()">Deal</button>
+    </p>
+    <p>Your Hand: <span id="player-hand"></span> (Total: <span id="player-total">0</span>)</p>
+    <p>Dealer's Hand: <span id="dealer-hand"></span> (Total: <span id="dealer-total">0</span>)</p>
+    <button onclick="hit()">Hit</button>
+    <button onclick="stand()">Stand</button>
+    <p id="message"></p>
+  </div>
 
   <script>
-    let credits = 100;
+    let credits = parseInt(localStorage.getItem("credits")) || 100;
     let playerHand = [];
     let dealerHand = [];
-    let deck = [];
+    let currentBet = 10;
 
     function updateUI() {
       document.getElementById("credits").textContent = credits;
@@ -31,10 +79,11 @@
       document.getElementById("dealer-hand").textContent = dealerHand.join(", ");
       document.getElementById("player-total").textContent = getTotal(playerHand);
       document.getElementById("dealer-total").textContent = getTotal(dealerHand);
+      localStorage.setItem("credits", credits);
     }
 
     function getCard() {
-      const cards = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11]; // face cards = 10, ace = 11
+      const cards = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11]; // Face cards = 10, Ace = 11
       return cards[Math.floor(Math.random() * cards.length)];
     }
 
@@ -49,26 +98,36 @@
     }
 
     function startGame() {
-      if (credits < 10) {
+      currentBet = parseInt(document.getElementById("bet").value) || 10;
+      if (currentBet > credits) {
         document.getElementById("message").textContent = "Not enough credits!";
         return;
       }
-      credits -= 10;
+
+      credits -= currentBet;
       playerHand = [getCard(), getCard()];
       dealerHand = [getCard(), getCard()];
       document.getElementById("message").textContent = "";
       updateUI();
+
+      if (getTotal(playerHand) === 21) {
+        credits += currentBet * 2.5;
+        document.getElementById("message").textContent = "Blackjack! You win!";
+        playerHand = [];
+        dealerHand = [];
+        updateUI();
+      }
     }
 
     function hit() {
       if (playerHand.length === 0) return;
       playerHand.push(getCard());
       updateUI();
-      const total = getTotal(playerHand);
-      if (total > 21) {
+      if (getTotal(playerHand) > 21) {
         document.getElementById("message").textContent = "Bust! You lose.";
         playerHand = [];
         dealerHand = [];
+        updateUI();
       }
     }
 
@@ -77,23 +136,28 @@
       while (getTotal(dealerHand) < 17) {
         dealerHand.push(getCard());
       }
+
       const playerTotal = getTotal(playerHand);
       const dealerTotal = getTotal(dealerHand);
       let result = "";
+
       if (dealerTotal > 21 || playerTotal > dealerTotal) {
-        result = "You win! +20 credits";
-        credits += 20;
+        credits += currentBet * 2;
+        result = "You win!";
       } else if (playerTotal === dealerTotal) {
-        result = "Push! +10 credits";
-        credits += 10;
+        credits += currentBet; // Push
+        result = "Push!";
       } else {
         result = "Dealer wins!";
       }
+
       document.getElementById("message").textContent = result;
       playerHand = [];
       dealerHand = [];
       updateUI();
     }
+
+    updateUI();
   </script>
 </body>
 </html>
