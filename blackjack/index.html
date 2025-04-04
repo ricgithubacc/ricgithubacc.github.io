@@ -6,6 +6,21 @@
   <title>Blackjack</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
   <style>
+    .animate-card {
+    animation: drawCard 0.3s ease;
+    }
+    @keyframes drawCard {
+    from {
+        transform: translateY(-20px) scale(0.8);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    }
+
+
     body {
       font-family: 'Roboto Mono', monospace;
       background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
@@ -80,6 +95,17 @@
       document.getElementById("player-total").textContent = getTotal(playerHand);
       document.getElementById("dealer-total").textContent = getTotal(dealerHand);
       localStorage.setItem("credits", credits);
+
+      const ph = document.getElementById("player-hand");
+  const dh = document.getElementById("dealer-hand");
+
+  ph.innerHTML = playerHand.map(card => `<span class="animate-card">${card}</span>`).join(", ");
+  dh.innerHTML = dealerHand.map(card => `<span class="animate-card">${card}</span>`).join(", ");
+
+  document.getElementById("player-total").textContent = getTotal(playerHand);
+  document.getElementById("dealer-total").textContent = getTotal(dealerHand);
+  document.getElementById("credits").textContent = credits;
+  localStorage.setItem("credits", credits);
     }
 
     function getCard() {
