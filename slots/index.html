@@ -13,7 +13,7 @@
       justify-content: center;
       align-items: center;
       font-family: 'Roboto Mono', monospace;
-      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      background: linear-gradient(1deg, #0f2027, #203a43, #2c5364);
       color: white;
       text-align: center;
     }
@@ -32,7 +32,6 @@
     }
     .slot {
       font-size: 50px;
-      width: 80px;
       height: 80px;
       display: flex;
       align-items: center;
@@ -107,16 +106,17 @@
   </div>
 
   <script>
-    const symbols = ['🍒', '🍋', '🍊', '🍇', '🔔', '⭐', '💎', '👑'];
+    const symbols = ['🍒', '🍋', '🍊', '🍇', '🔔', '⭐', '💎', '👑', '🃏', '🎁']; // 🃏 = Wild, 🎁 = Bonus
     const payouts = {
-      '🍒': { three: 20, two: 2 },
-      '🍋': { three: 15, two: 1.5 },
-      '🍊': { three: 10, two: 1 },
-      '🍇': { three: 12, two: 1.2 },
-      '🔔': { three: 30, two: 3 },
-      '⭐': { three: 25, two: 2.5 },
-      '💎': { three: 100, two: 10 },
-      '👑': { three: 80, two: 8 }
+      '🍒': { three: 5 },
+      '🍋': { three: 4 },
+      '🍊': { three: 3 },
+      '🍇': { three: 4 },
+      '🔔': { three: 6 },
+      '⭐': { three: 5 },
+      '💎': { three: 10 },
+      '👑': { three: 8 },
+      '🃏': { three: 20 }
     };
 
     let score = 100, spins = 0, wins = 0, turboInterval = null;
@@ -154,6 +154,12 @@
       } else clearInterval(turboInterval);
     }
 
+    function triggerBonusRound() {
+      const bonusWin = Math.floor(Math.random() * 50) + 10; // 10–59 coins
+      score += bonusWin;
+      alert(`🎁 Bonus Round! You found a treasure chest with ${bonusWin} coins!`);
+    }
+
     function spinSlots() {
       const bet = parseInt(document.getElementById('bet').value);
       const resultEl = document.getElementById('result');
@@ -175,28 +181,44 @@
 
       let totalWin = 0;
       const lines = [
-        [0,1,2],[3,4,5],[6,7,8], // rows
-        [0,3,6],[1,4,7],[2,5,8], // cols
-        [0,4,8],[2,4,6]          // diagonals
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
       ];
 
       let winOccurred = false;
+      let bonusTriggered = false;
+
       lines.forEach(line => {
         const [a,b,c] = line;
-        if (grid[a] === grid[b] && grid[b] === grid[c]) {
-          totalWin += payouts[grid[a]].three * bet;
-          slots[a].classList.add('win');
-          slots[b].classList.add('win');
-          slots[c].classList.add('win');
-          winOccurred = true;
-        } else if (grid[a] === grid[b] || grid[b] === grid[c] || grid[a] === grid[c]) {
-          const match = grid[a] === grid[b] ? [a,b] : (grid[b] === grid[c] ? [b,c] : [a,c]);
-          totalWin += payouts[grid[match[0]]].two * bet;
-          slots[match[0]].classList.add('win');
-          slots[match[1]].classList.add('win');
+        const vals = [grid[a], grid[b], grid[c]];
+        const wild = vals.filter(v => v === '🃏').length;
+        const counts = vals.reduce((acc, sym) => {
+          acc[sym] = (acc[sym] || 0) + 1;
+          return acc;
+        }, {});
+
+        for (const sym in counts) {
+          if (sym !== '🃏' && counts[sym] + wild === 3) {
+            totalWin += payouts[sym]?.three * bet || 0;
+            [a,b,c].forEach(i => slots[i].classList.add('win'));
+            winOccurred = true;
+            break;
+          }
+        }
+
+        if (wild === 3) {
+          totalWin += payouts['🃏'].three * bet;
+          [a,b,c].forEach(i => slots[i].classList.add('win'));
           winOccurred = true;
         }
+
+        if (vals.every(v => v === '🎁')) {
+          bonusTriggered = true;
+        }
       });
+
+      if (bonusTriggered) triggerBonusRound();
 
       if (totalWin > 0) {
         score += totalWin;
