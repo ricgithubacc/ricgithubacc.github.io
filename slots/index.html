@@ -46,6 +46,9 @@
     .win {
       animation: bounce 0.6s ease;
     }
+    .bonus {
+      animation: bonusFlash 1s ease-in-out 3;
+    }
     @keyframes spin {
       0% { transform: rotateX(0deg); }
       50% { transform: rotateX(180deg); }
@@ -55,6 +58,10 @@
       0% { transform: scale(1); }
       50% { transform: scale(1.4); }
       100% { transform: scale(1); }
+    }
+    @keyframes bonusFlash {
+      0%, 100% { background-color: #ffc107; color: black; }
+      50% { background-color: #ff5722; color: white; }
     }
     button, select, input[type="checkbox"] {
       margin: 10px 5px;
@@ -70,7 +77,7 @@
     button:hover, select:hover {
       background-color: #16a085;
     }
-    input[type="number"] {
+    input[type="number"], input[type="range"] {
       width: 80px;
       padding: 5px;
       font-size: 16px;
@@ -95,6 +102,7 @@
     <p>Coins: <span id="score">0</span></p>
     <p>Bet: <input type="number" id="bet" value="10" min="1" /></p>
     <label><input type="checkbox" id="turbo" onchange="toggleTurbo()" /> Turbo Mode</label>
+    <p>Turbo Speed: <input type="range" id="turboSpeed" min="10" max="1000" value="500" step="100" /> <span id="speedDisplay">500</span>ms</p>
     <div class="grid" id="slots">
       <span class="slot">🍒</span><span class="slot">🍒</span><span class="slot">🍒</span>
       <span class="slot">🍒</span><span class="slot">🍒</span><span class="slot">🍒</span>
@@ -106,17 +114,11 @@
   </div>
 
   <script>
-    const symbols = ['🍒', '🍋', '🍊', '🍇', '🔔', '⭐', '💎', '👑', '🃏', '🎁']; // 🃏 = Wild, 🎁 = Bonus
+    const symbols = ['🍒', '🍋', '🍊', '🍇', '🔔', '⭐', '💎', '👑', '🃏', '🎁'];
     const payouts = {
-      '🍒': { three: 5 },
-      '🍋': { three: 4 },
-      '🍊': { three: 3 },
-      '🍇': { three: 4 },
-      '🔔': { three: 6 },
-      '⭐': { three: 5 },
-      '💎': { three: 10 },
-      '👑': { three: 8 },
-      '🃏': { three: 20 }
+      '🍒': { three: 5 }, '🍋': { three: 4 }, '🍊': { three: 3 },
+      '🍇': { three: 4 }, '🔔': { three: 6 }, '⭐': { three: 5 },
+      '💎': { three: 10 }, '👑': { three: 8 }, '🃏': { three: 20 }
     };
 
     let score = 100, spins = 0, wins = 0, turboInterval = null;
@@ -143,21 +145,34 @@
       return symbols[Math.floor(Math.random() * symbols.length)];
     }
 
+    document.getElementById('turboSpeed').addEventListener('input', e => {
+      document.getElementById('speedDisplay').textContent = e.target.value;
+      if (document.getElementById('turbo').checked) {
+        clearInterval(turboInterval);
+        toggleTurbo();
+      }
+    });
+
     function toggleTurbo() {
       const on = document.getElementById('turbo').checked;
+      const speed = parseInt(document.getElementById('turboSpeed').value);
       if (on) {
         turboInterval = setInterval(() => {
           const bet = parseInt(document.getElementById('bet').value);
           if (score >= bet) spinSlots();
           else document.getElementById('turbo').checked = false;
-        }, 1500);
+        }, speed);
       } else clearInterval(turboInterval);
     }
 
     function triggerBonusRound() {
-      const bonusWin = Math.floor(Math.random() * 50) + 10; // 10–59 coins
+      const bonusWin = Math.floor(Math.random() * 50) + 10;
       score += bonusWin;
-      alert(`🎁 Bonus Round! You found a treasure chest with ${bonusWin} coins!`);
+      document.getElementById('result').textContent = `🎁 Bonus Round! You won ${bonusWin} bonus coins!`;
+      document.getElementById('result').style.color = 'gold';
+      document.querySelectorAll('.slot').forEach(slot => {
+        if (slot.textContent === '🎁') slot.classList.add('bonus');
+      });
     }
 
     function spinSlots() {
@@ -172,10 +187,11 @@
       spins++;
       const slots = document.querySelectorAll('.slot');
       let grid = [];
+      slots.forEach(slot => slot.classList.remove('win', 'bonus'));
+
       for (let i = 0; i < 9; i++) {
         const symbol = getRandomSymbol();
         slots[i].textContent = symbol;
-        slots[i].classList.remove('win');
         grid.push(symbol);
       }
 
@@ -213,9 +229,7 @@
           winOccurred = true;
         }
 
-        if (vals.every(v => v === '🎁')) {
-          bonusTriggered = true;
-        }
+        if (vals.every(v => v === '🎁')) bonusTriggered = true;
       });
 
       if (bonusTriggered) triggerBonusRound();
@@ -225,7 +239,7 @@
         wins++;
         resultEl.textContent = `🎉 You won ${totalWin} coins!`;
         resultEl.style.color = 'lime';
-      } else {
+      } else if (!bonusTriggered) {
         resultEl.textContent = "😢 No win this time.";
         resultEl.style.color = 'red';
       }
