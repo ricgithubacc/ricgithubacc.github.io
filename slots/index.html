@@ -28,10 +28,23 @@
       box-shadow: 0 0 15px rgba(0,0,0,0.6);
     }
 
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      justify-content: center;
+      margin: 15px 0;
+    }
+
     .slot {
-      font-size: 60px;
+      font-size: 50px;
       width: 80px;
-      display: inline-block;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
       transition: transform 0.3s ease;
     }
 
@@ -61,6 +74,16 @@
       background-color: #16a085;
     }
 
+    input[type="number"] {
+      width: 80px;
+      padding: 5px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: none;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
     p {
       font-size: 1.1rem;
     }
@@ -76,17 +99,27 @@
   <h1>Slot Machine</h1>
   <div id="game-area">
     <p>Coins: <span id="score">0</span></p>
-    <div id="slots">
+    <p>Bet Amount: <input type="number" id="bet" value="10" min="1" /></p>
+
+    <div id="slots" class="grid">
+      <!-- 9 Slots -->
       <span class="slot">🍒</span>
       <span class="slot">🍋</span>
       <span class="slot">🍊</span>
+      <span class="slot">🍇</span>
+      <span class="slot">🔔</span>
+      <span class="slot">⭐</span>
+      <span class="slot">🍉</span>
+      <span class="slot">💎</span>
+      <span class="slot">🍎</span>
     </div>
+
     <button onclick="spinSlots()">Spin</button>
     <p id="result"></p>
   </div>
 
   <script>
-    const emojis = ['🍒', '🍋', '🍊', '🍇', '🔔', '⭐'];
+    const emojis = ['🍒', '🍋', '🍊', '🍇', '🔔', '⭐', '🍉', '💎', '🍎'];
     let score = 100;
 
     function loadScore() {
@@ -107,39 +140,59 @@
     }
 
     function spinSlots() {
-      if (score < 10) {
-        document.getElementById('result').textContent = "💸 Not enough coins!";
+      const bet = parseInt(document.getElementById('bet').value);
+      const resultEl = document.getElementById('result');
+
+      if (isNaN(bet) || bet <= 0) {
+        resultEl.textContent = "⚠️ Enter a valid bet.";
         return;
       }
 
-      score -= 10;
+      if (score < bet) {
+        resultEl.textContent = "💸 Not enough coins!";
+        return;
+      }
+
+      score -= bet;
       updateScoreDisplay();
       saveScore();
+      resultEl.textContent = "";
 
       const slots = document.querySelectorAll('.slot');
-      const result = document.getElementById('result');
-      result.textContent = '';
-
       slots.forEach(slot => slot.classList.add('spin'));
 
       setTimeout(() => {
-        let results = [];
-
+        const values = [];
         slots.forEach(slot => {
           const symbol = getRandomSymbol();
           slot.textContent = symbol;
-          results.push(symbol);
+          values.push(symbol);
           slot.classList.remove('spin');
         });
 
-        const [s1, s2, s3] = results;
-        if (s1 === s2 && s2 === s3) {
-          score += 50;
-          result.textContent = '🎉 Jackpot! You Win 50 Coins!';
-          result.style.color = 'lime';
+        const winLines = [
+          [0,1,2], [3,4,5], [6,7,8], // Rows
+          [0,3,6], [1,4,7], [2,5,8], // Columns
+          [0,4,8], [2,4,6]           // Diagonals
+        ];
+
+        let won = false;
+        for (let line of winLines) {
+          const [a,b,c] = line;
+          if (values[a] === values[b] && values[b] === values[c]) {
+            won = true;
+            break;
+          }
+        }
+
+        if (won) {
+          const winAmount = bet * 3;
+          score += winAmount;
+          resultEl.textContent = `🎉 You won ${winAmount} coins!`;
+          resultEl.style.color = 'lime';
         } else {
-          result.textContent = '😢 No match. Try again!';
-          result.style.color = 'red';
+          resultEl.textContent = "😢 No match. Try again!";
+          resultEl.style.color = 'red';
         }
 
         updateScoreDisplay();
