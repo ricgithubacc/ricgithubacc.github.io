@@ -13,18 +13,27 @@
       text-align: center;
       padding: 20px;
     }
+    html, body {
+  height: 100%;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 
     h1 {
       font-size: 2.5rem;
       margin-bottom: 10px;
     }
+    
 
     #game-area {
       background: rgba(0, 0, 0, 0.3);
       border-radius: 16px;
       padding: 20px;
       margin: auto;
-      max-width: 400px;
+      max-width: 420px;
       box-shadow: 0 0 15px rgba(0,0,0,0.6);
     }
 
@@ -52,13 +61,23 @@
       animation: spin 0.6s infinite;
     }
 
+    .win {
+      animation: bounce 0.6s ease;
+    }
+
     @keyframes spin {
       0% { transform: rotateX(0deg); }
       50% { transform: rotateX(180deg); }
       100% { transform: rotateX(360deg); }
     }
 
-    button {
+    @keyframes bounce {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.4); }
+      100% { transform: scale(1); }
+    }
+
+    button, select {
       margin: 10px 5px;
       padding: 10px 20px;
       font-size: 16px;
@@ -70,7 +89,7 @@
       transition: background 0.3s ease;
     }
 
-    button:hover {
+    button:hover, select:hover {
       background-color: #16a085;
     }
 
@@ -93,16 +112,30 @@
       margin-top: 15px;
       font-weight: bold;
     }
+
+    #stats {
+      font-size: 0.95rem;
+      opacity: 0.8;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
   <h1>Slot Machine</h1>
+  
   <div id="game-area">
     <p>Coins: <span id="score">0</span></p>
-    <p>Bet Amount: <input type="number" id="bet" value="10" min="1" /></p>
+    <p>Bet: <input type="number" id="bet" value="10" min="1" /></p>
+    <p>
+      Theme:
+      <select id="theme" onchange="changeTheme()">
+        <option value="classic">🍒 Classic Fruits</option>
+        <option value="rare">💎 Rich & Rare</option>
+        <option value="emoji">🎉 Emoji Party</option>
+      </select>
+    </p>
 
     <div id="slots" class="grid">
-      <!-- 9 Slots -->
       <span class="slot">🍒</span>
       <span class="slot">🍋</span>
       <span class="slot">🍊</span>
@@ -115,31 +148,77 @@
     </div>
 
     <button onclick="spinSlots()">Spin</button>
+    <label style="display: block; margin-top: 10px;">
+      <input type="checkbox" id="turbo" onchange="toggleTurbo()" />
+      Turbo Mode
+    </label>
+    
     <p id="result"></p>
+    <div id="stats"></div>
   </div>
 
   <script>
-    const emojis = ['🍒', '🍋', '🍊', '🍇', '🔔', '⭐', '🍉', '💎', '🍎'];
+    const themes = {
+      classic: ['🍒', '🍋', '🍊', '🍇', '🍉', '🍎'],
+      rare: ['💎', '💰', '🪙', '🔔', '👑', '💵'],
+      emoji: ['😂', '🤩', '😎', '🥳', '🔥', '💯']
+    };
+
+    let currentTheme = 'classic';
+    let symbols = themes[currentTheme];
     let score = 100;
+    let spins = 0;
+    let wins = 0;
 
     function loadScore() {
       const saved = localStorage.getItem('slotScore');
       score = saved ? parseInt(saved) : 100;
+
+      spins = parseInt(localStorage.getItem('slotSpins')) || 0;
+      wins = parseInt(localStorage.getItem('slotWins')) || 0;
     }
 
     function saveScore() {
       localStorage.setItem('slotScore', score);
+      localStorage.setItem('slotSpins', spins);
+      localStorage.setItem('slotWins', wins);
     }
 
     function updateScoreDisplay() {
       document.getElementById('score').textContent = score;
+      const winRate = spins > 0 ? ((wins / spins) * 100).toFixed(1) : 0;
+      document.getElementById('stats').textContent = `Total Spins: ${spins} | Wins: ${wins} | Win Rate: ${winRate}%`;
     }
 
     function getRandomSymbol() {
-      return emojis[Math.floor(Math.random() * emojis.length)];
+      return symbols[Math.floor(Math.random() * symbols.length)];
+    }
+
+    function changeTheme() {
+      currentTheme = document.getElementById('theme').value;
+      symbols = themes[currentTheme];
     }
 
     function spinSlots() {
+      let turboInterval = null;
+
+function toggleTurbo() {
+  const turboOn = document.getElementById('turbo').checked;
+  if (turboOn) {
+    turboInterval = setInterval(() => {
+      if (score >= parseInt(document.getElementById('bet').value)) {
+        spinSlots();
+      } else {
+        document.getElementById('result').textContent = "💸 Out of coins!";
+        document.getElementById('turbo').checked = false;
+        clearInterval(turboInterval);
+      }
+    }, 1500);
+  } else {
+    clearInterval(turboInterval);
+  }
+}
+
       const bet = parseInt(document.getElementById('bet').value);
       const resultEl = document.getElementById('result');
 
@@ -154,15 +233,20 @@
       }
 
       score -= bet;
+      spins++;
       updateScoreDisplay();
       saveScore();
       resultEl.textContent = "";
 
       const slots = document.querySelectorAll('.slot');
-      slots.forEach(slot => slot.classList.add('spin'));
+      const values = [];
+
+      slots.forEach(slot => {
+        slot.classList.remove('win');
+        slot.classList.add('spin');
+      });
 
       setTimeout(() => {
-        const values = [];
         slots.forEach(slot => {
           const symbol = getRandomSymbol();
           slot.textContent = symbol;
@@ -171,25 +255,48 @@
         });
 
         const winLines = [
-          [0,1,2], [3,4,5], [6,7,8], // Rows
-          [0,3,6], [1,4,7], [2,5,8], // Columns
-          [0,4,8], [2,4,6]           // Diagonals
+          [0,1,2], [3,4,5], [6,7,8],
+          [0,3,6], [1,4,7], [2,5,8],
+          [0,4,8], [2,4,6]
         ];
 
-        let won = false;
-        for (let line of winLines) {
-          const [a,b,c] = line;
+        let multiplier = 0;
+        let matchCount = 0;
+        let winningIndices = new Set();
+
+        winLines.forEach(([a,b,c]) => {
           if (values[a] === values[b] && values[b] === values[c]) {
-            won = true;
-            break;
+            if ((a === 0 && c === 8) || (a === 2 && c === 6)) {
+              multiplier += 5;
+            } else {
+              multiplier += 3;
+            }
+            matchCount++;
+            winningIndices.add(a);
+            winningIndices.add(b);
+            winningIndices.add(c);
           }
+        });
+
+        const first = values[0];
+        if (values.every(v => v === first)) {
+          multiplier = 10;
+          winningIndices = new Set([...Array(9).keys()]);
         }
 
-        if (won) {
-          const winAmount = bet * 3;
-          score += winAmount;
-          resultEl.textContent = `🎉 You won ${winAmount} coins!`;
+        if (multiplier > 0) {
+          const win = bet * multiplier;
+          score += win;
+          wins++;
+          resultEl.textContent = `🎉 ${matchCount} win${matchCount > 1 ? 's' : ''}! You won ${win} coins!`;
           resultEl.style.color = 'lime';
+
+          // animate winning symbols
+          slots.forEach((slot, i) => {
+            if (winningIndices.has(i)) {
+              slot.classList.add('win');
+            }
+          });
         } else {
           resultEl.textContent = "😢 No match. Try again!";
           resultEl.style.color = 'red';
