@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple Poker (Multiplayer)</title>
+  <style>
+    body {
+      font-family: monospace;
+      background-color: #121212;
+      color: #f0f0f0;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .cards {
+      margin: 1rem 0;
+    }
+    .hand, .community {
+      margin: 0.5rem;
+    }
+    .controls button {
+      margin: 0.5rem;
+      padding: 0.5rem 1rem;
+      background-color: #222;
+      color: white;
+      border: 1px solid #444;
+      cursor: pointer;
+    }
+    .controls button:hover {
+      background-color: #333;
+    }
+    .bet-controls {
+      margin-top: 1rem;
+    }
+    .bet-controls input {
+      width: 60px;
+      margin-right: 0.5rem;
+      background-color: #1c1c1c;
+      color: white;
+      border: 1px solid #444;
+      padding: 0.3rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Simple Poker (Multiplayer)</h1>
+  <div class="cards">
+    <div class="hand">Your hand: <span id="player-hand"></span></div>
+    <div class="community">Community: <span id="community-cards"></span></div>
+  </div>
+  <div id="login">
+    <input id="username" placeholder="Enter your name" />
+    <button onclick="joinGame()">Join Game</button>
+  </div>
+  
+  <div class="controls">
+    <button onclick="startGame()">Start Game</button>
+    <button onclick="flop()">Flop</button>
+    <button onclick="turn()">Turn</button>
+    <button onclick="river()">River</button>
+    <button onclick="fold()">Fold</button>
+  </div>
+  <div class="bet-controls">
+    <input type="number" id="bet-amount" placeholder="Bet" />
+    <button onclick="bet()">Bet</button>
+  </div>
+  <div id="log"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    let playerId = null;
+    let playerHand = [];
+    let communityCards = [];
+    let pot = 0;
+
+    socket.on('player-joined', (data) => {
+      playerId = data.playerId;
+      log('You joined the game! Waiting for others...');
+    });
+
+    socket.on('room-full', () => {
+      log('Room is full. Try again later.');
+    });
+
+    socket.on('game-started', (data) => {
+      playerHand = data.players[playerId].hand;
+      communityCards = data.communityCards;
+      pot = data.pot;
+      updateDisplay();
+      log('Game started!');
+    });
+
+    socket.on('update-community', (cards) => {
+      communityCards = cards;
+      updateDisplay();
+      log('Community cards updated.');
+    });
+
+    socket.on('update-pot', (updatedPot) => {
+      pot = updatedPot;
+      log('Pot updated.');
+    });
+
+    socket.on('player-folded', (foldedId) => {
+      log(`${foldedId === playerId ? 'You' : 'Opponent'} folded.`);
+    });
+
+    socket.on('player-disconnected', (id) => {
+      log('A player disconnected.');
+    });
+
+    function updateDisplay() {
+      document.getElementById('player-hand').innerText = playerHand.join(' ');
+      document.getElementById('community-cards').innerText = communityCards.join(' ');
+    }
+
+    function log(message) {
+      document.getElementById('log').innerText = `Pot: $${pot} | ${message}`;
+    }
+
+    function startGame() {
+      socket.emit('start-game');
+    }
+
+    function flop() {
+      socket.emit('deal-flop');
+    }
+
+    function turn() {
+      socket.emit('deal-turn');
+    }
+
+    function river() {
+      socket.emit('deal-river');
+    }
+
+    function bet() {
+      const amount = parseInt(document.getElementById('bet-amount').value);
+      if (!isNaN(amount) && amount > 0) {
+        socket.emit('bet', amount);
+        document.getElementById('bet-amount').value = '';
+      } else {
+        log("Invalid bet amount.");
+      }
+    }
+
+    function fold() {
+      socket.emit('fold', playerId);
+    }
+    function joinGame() {
+  const username = document.getElementById('username').value;
+  if (username.trim()) {
+    socket.emit('join', username.trim());
+  }
+}
+
+socket.on('joined', (data) => {
+  playerId = data.playerId;
+  document.getElementById('login').style.display = 'none';
+  log(`Joined as ${data.slot}`);
+});
+
+socket.on('room-full', () => {
+  log('Room is full.');
+});
+
+  </script>
+</body>
+</html>

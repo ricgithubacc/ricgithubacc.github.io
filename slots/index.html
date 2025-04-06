@@ -46,6 +46,10 @@
     .win {
       animation: bounce 0.6s ease;
     }
+    .highlight {
+      box-shadow: 0 0 15px 5px yellow;
+      border: 2px solid yellow;
+    }
     .bonus {
       animation: bonusFlash 1s ease-in-out 3;
     }
@@ -109,6 +113,7 @@
       <span class="slot">🍒</span><span class="slot">🍒</span><span class="slot">🍒</span>
     </div>
     <button onclick="spinSlots()">Spin</button>
+    <button onclick="resetGame()">Reset</button>
     <p id="result"></p>
     <div id="stats"></div>
   </div>
@@ -121,7 +126,17 @@
       '💎': { three: 10 }, '👑': { three: 8 }, '🃏': { three: 20 }
     };
 
-    let score = 100, spins = 0, wins = 0, turboInterval = null;
+    const weightedSymbols = [
+      '🍒','🍒','🍒','🍒','🍒',
+      '🍋','🍋','🍋',
+      '🍊','🍊',
+      '🍇','🍇',
+      '🔔','🔔',
+      '⭐','⭐',
+      '💎','👑','🃏','🎁'
+    ];
+
+    let score = 100, spins = 0, wins = 0, turboInterval = null, winStreak = 0;
 
     function loadScore() {
       score = parseInt(localStorage.getItem('slotScore')) || 100;
@@ -142,7 +157,7 @@
     }
 
     function getRandomSymbol() {
-      return symbols[Math.floor(Math.random() * symbols.length)];
+      return weightedSymbols[Math.floor(Math.random() * weightedSymbols.length)];
     }
 
     document.getElementById('turboSpeed').addEventListener('input', e => {
@@ -175,6 +190,16 @@
       });
     }
 
+    function resetGame() {
+      score = 100;
+      spins = 0;
+      wins = 0;
+      winStreak = 0;
+      saveScore();
+      updateDisplay();
+      document.getElementById('result').textContent = '';
+    }
+
     function spinSlots() {
       const bet = parseInt(document.getElementById('bet').value);
       const resultEl = document.getElementById('result');
@@ -187,7 +212,7 @@
       spins++;
       const slots = document.querySelectorAll('.slot');
       let grid = [];
-      slots.forEach(slot => slot.classList.remove('win', 'bonus'));
+      slots.forEach(slot => slot.classList.remove('win', 'bonus', 'highlight'));
 
       for (let i = 0; i < 9; i++) {
         const symbol = getRandomSymbol();
@@ -217,7 +242,7 @@
         for (const sym in counts) {
           if (sym !== '🃏' && counts[sym] + wild === 3) {
             totalWin += payouts[sym]?.three * bet || 0;
-            [a,b,c].forEach(i => slots[i].classList.add('win'));
+            [a,b,c].forEach(i => slots[i].classList.add('win', 'highlight'));
             winOccurred = true;
             break;
           }
@@ -225,7 +250,7 @@
 
         if (wild === 3) {
           totalWin += payouts['🃏'].three * bet;
-          [a,b,c].forEach(i => slots[i].classList.add('win'));
+          [a,b,c].forEach(i => slots[i].classList.add('win', 'highlight'));
           winOccurred = true;
         }
 
@@ -235,11 +260,15 @@
       if (bonusTriggered) triggerBonusRound();
 
       if (totalWin > 0) {
+        winStreak++;
+        const streakBonus = Math.floor(totalWin * winStreak * 0.1);
+        totalWin += streakBonus;
         score += totalWin;
         wins++;
-        resultEl.textContent = `🎉 You won ${totalWin} coins!`;
+        resultEl.textContent = `🎉 You won ${totalWin} coins! (Streak x${winStreak})`;
         resultEl.style.color = 'lime';
       } else if (!bonusTriggered) {
+        winStreak = 0;
         resultEl.textContent = "😢 No win this time.";
         resultEl.style.color = 'red';
       }
