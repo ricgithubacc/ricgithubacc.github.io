@@ -11,6 +11,7 @@
       margin: 0 5px;
       vertical-align: middle;
     }
+
     @keyframes drawCard {
       from {
         transform: translateY(-20px) scale(0.8);
@@ -29,18 +30,32 @@
       text-align: center;
       padding: 20px;
     }
+
     h1 {
       font-size: 2.5rem;
       margin-bottom: 10px;
     }
+
     #game-area {
       background: rgba(0, 0, 0, 0.3);
       border-radius: 16px;
       padding: 20px;
       margin: auto;
-      max-width: 420px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.6);
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
+      flex-direction: column;
+      gap: 12px;
     }
+
+    .hand-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
     button {
       margin: 10px 5px;
       padding: 10px 20px;
@@ -52,9 +67,11 @@
       color: white;
       transition: background 0.3s ease;
     }
+
     button:hover {
       background-color: #16a085;
     }
+
     input[type=number] {
       width: 60px;
       padding: 5px;
@@ -63,6 +80,7 @@
       border: none;
       text-align: center;
     }
+
     p {
       font-size: 1.1rem;
     }
@@ -76,8 +94,13 @@
       Bet: <input type="number" id="bet" value="10" min="1" />
       <button onclick="startGame()">Deal</button>
     </p>
-    <p>Your Hand: <span id="player-hand"></span> (Total: <span id="player-total">0</span>)</p>
-    <p>Dealer's Hand: <span id="dealer-hand"></span> (Total: <span id="dealer-total">0</span>)</p>
+
+    <p>Your Hand: <span id="player-total">0</span></p>
+    <div id="player-hand" class="hand-row"></div>
+
+    <p>Dealer's Hand: <span id="dealer-total">0</span></p>
+    <div id="dealer-hand" class="hand-row"></div>
+
     <button onclick="hit()">Hit</button>
     <button onclick="stand()">Stand</button>
     <button id="play-again" style="display:none;" onclick="startGame()">Play Again</button>
@@ -133,7 +156,8 @@
       ph.innerHTML = playerHand.map(cardToImg).join(" ");
 
       if (!showDealerFull && dealerHand.length > 0) {
-        dh.innerHTML = cardToImg(dealerHand[0]) + `<img class="animate-card" src="https://deckofcardsapi.com/static/img/back.png" width="60" />`;
+        dh.innerHTML = cardToImg(dealerHand[0]) +
+          `<img class="animate-card" src="https://deckofcardsapi.com/static/img/back.png" width="60" />`;
         document.getElementById("dealer-total").textContent = "?";
       } else {
         dh.innerHTML = dealerHand.map(cardToImg).join(" ");
