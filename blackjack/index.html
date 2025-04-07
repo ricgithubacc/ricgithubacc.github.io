@@ -8,6 +8,8 @@
   <style>
     .animate-card {
       animation: drawCard 0.3s ease;
+      margin: 0 5px;
+      vertical-align: middle;
     }
     @keyframes drawCard {
       from {
@@ -36,7 +38,7 @@
       border-radius: 16px;
       padding: 20px;
       margin: auto;
-      max-width: 400px;
+      max-width: 420px;
       box-shadow: 0 0 15px rgba(0,0,0,0.6);
     }
     button {
@@ -88,45 +90,58 @@
     let dealerHand = [];
     let currentBet = 10;
 
+    function getCard() {
+      const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+      const suits = ['S', 'H', 'D', 'C']; // Spades, Hearts, Diamonds, Clubs
+      const value = values[Math.floor(Math.random() * values.length)];
+      const suit = suits[Math.floor(Math.random() * suits.length)];
+      return `${value}${suit}`; // e.g., "10H", "AS"
+    }
+
+    function cardToImg(card) {
+      const code = card.replace("10", "0"); // API uses 0 for 10
+      return `<img class="animate-card" src="https://deckofcardsapi.com/static/img/${code}.png" width="60" />`;
+    }
+
+    function getTotal(hand) {
+      let total = 0;
+      let aces = 0;
+      hand.forEach(card => {
+        let value = card.slice(0, -1); // remove suit
+        if (['J', 'Q', 'K'].includes(value)) {
+          total += 10;
+        } else if (value === 'A') {
+          total += 11;
+          aces++;
+        } else {
+          total += parseInt(value);
+        }
+      });
+      while (total > 21 && aces > 0) {
+        total -= 10;
+        aces--;
+      }
+      return total;
+    }
+
     function updateUI(showDealerFull = false) {
       document.getElementById("credits").textContent = credits;
 
       const ph = document.getElementById("player-hand");
       const dh = document.getElementById("dealer-hand");
 
-      ph.innerHTML = playerHand.map(card => `<span class="animate-card">${card}</span>`).join(", ");
+      ph.innerHTML = playerHand.map(cardToImg).join(" ");
 
       if (!showDealerFull && dealerHand.length > 0) {
-        const hidden = `<span class="animate-card">?</span>`;
-        const shown = `<span class="animate-card">${dealerHand[0]}</span>`;
-        dh.innerHTML = `${shown}, ${hidden}`;
+        dh.innerHTML = cardToImg(dealerHand[0]) + `<img class="animate-card" src="https://deckofcardsapi.com/static/img/back.png" width="60" />`;
         document.getElementById("dealer-total").textContent = "?";
       } else {
-        dh.innerHTML = dealerHand.map(card => `<span class="animate-card">${card}</span>`).join(", ");
+        dh.innerHTML = dealerHand.map(cardToImg).join(" ");
         document.getElementById("dealer-total").textContent = getTotal(dealerHand);
       }
 
       document.getElementById("player-total").textContent = getTotal(playerHand);
       localStorage.setItem("credits", credits);
-    }
-
-    function getCard() {
-      const values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11]; // Face cards = 10, Ace = 11
-      const suits = ['♠', '♥', '♦', '♣'];
-      const value = values[Math.floor(Math.random() * values.length)];
-      const suit = suits[Math.floor(Math.random() * suits.length)];
-      return `${value}${suit}`;
-    }
-
-    function getTotal(hand) {
-      let values = hand.map(card => parseInt(card));
-      let total = values.reduce((a, b) => a + b, 0);
-      let aces = values.filter(v => v === 11).length;
-      while (total > 21 && aces > 0) {
-        total -= 10;
-        aces--;
-      }
-      return total;
     }
 
     function startGame() {
@@ -141,7 +156,6 @@
       dealerHand = [getCard(), getCard()];
       document.getElementById("message").textContent = "";
 
-      // Reset buttons
       document.querySelector("button[onclick='hit()']").style.display = "inline-block";
       document.querySelector("button[onclick='stand()']").style.display = "inline-block";
       document.getElementById("play-again").style.display = "none";
@@ -177,7 +191,7 @@
         credits += currentBet * 2;
         result = "You win!";
       } else if (playerTotal === dealerTotal) {
-        credits += currentBet; // Push
+        credits += currentBet;
         result = "Push!";
       } else {
         result = "Dealer wins!";
