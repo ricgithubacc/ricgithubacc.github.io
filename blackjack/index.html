@@ -7,19 +7,18 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
   <style>
     .animate-card {
-    animation: drawCard 0.3s ease;
+      animation: drawCard 0.3s ease;
     }
     @keyframes drawCard {
-    from {
+      from {
         transform: translateY(-20px) scale(0.8);
         opacity: 0;
-    }
-    to {
+      }
+      to {
         transform: translateY(0) scale(1);
         opacity: 1;
+      }
     }
-    }
-
 
     body {
       font-family: 'Roboto Mono', monospace;
@@ -79,6 +78,7 @@
     <p>Dealer's Hand: <span id="dealer-hand"></span> (Total: <span id="dealer-total">0</span>)</p>
     <button onclick="hit()">Hit</button>
     <button onclick="stand()">Stand</button>
+    <button id="play-again" style="display:none;" onclick="startGame()">Play Again</button>
     <p id="message"></p>
   </div>
 
@@ -88,34 +88,40 @@
     let dealerHand = [];
     let currentBet = 10;
 
-    function updateUI() {
+    function updateUI(showDealerFull = false) {
       document.getElementById("credits").textContent = credits;
-      document.getElementById("player-hand").textContent = playerHand.join(", ");
-      document.getElementById("dealer-hand").textContent = dealerHand.join(", ");
-      document.getElementById("player-total").textContent = getTotal(playerHand);
-      document.getElementById("dealer-total").textContent = getTotal(dealerHand);
-      localStorage.setItem("credits", credits);
 
       const ph = document.getElementById("player-hand");
-  const dh = document.getElementById("dealer-hand");
+      const dh = document.getElementById("dealer-hand");
 
-  ph.innerHTML = playerHand.map(card => `<span class="animate-card">${card}</span>`).join(", ");
-  dh.innerHTML = dealerHand.map(card => `<span class="animate-card">${card}</span>`).join(", ");
+      ph.innerHTML = playerHand.map(card => `<span class="animate-card">${card}</span>`).join(", ");
 
-  document.getElementById("player-total").textContent = getTotal(playerHand);
-  document.getElementById("dealer-total").textContent = getTotal(dealerHand);
-  document.getElementById("credits").textContent = credits;
-  localStorage.setItem("credits", credits);
+      if (!showDealerFull && dealerHand.length > 0) {
+        const hidden = `<span class="animate-card">?</span>`;
+        const shown = `<span class="animate-card">${dealerHand[0]}</span>`;
+        dh.innerHTML = `${shown}, ${hidden}`;
+        document.getElementById("dealer-total").textContent = "?";
+      } else {
+        dh.innerHTML = dealerHand.map(card => `<span class="animate-card">${card}</span>`).join(", ");
+        document.getElementById("dealer-total").textContent = getTotal(dealerHand);
+      }
+
+      document.getElementById("player-total").textContent = getTotal(playerHand);
+      localStorage.setItem("credits", credits);
     }
 
     function getCard() {
-      const cards = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11]; // Face cards = 10, Ace = 11
-      return cards[Math.floor(Math.random() * cards.length)];
+      const values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11]; // Face cards = 10, Ace = 11
+      const suits = ['♠', '♥', '♦', '♣'];
+      const value = values[Math.floor(Math.random() * values.length)];
+      const suit = suits[Math.floor(Math.random() * suits.length)];
+      return `${value}${suit}`;
     }
 
     function getTotal(hand) {
-      let total = hand.reduce((a, b) => a + b, 0);
-      let aces = hand.filter(card => card === 11).length;
+      let values = hand.map(card => parseInt(card));
+      let total = values.reduce((a, b) => a + b, 0);
+      let aces = values.filter(v => v === 11).length;
       while (total > 21 && aces > 0) {
         total -= 10;
         aces--;
@@ -134,26 +140,26 @@
       playerHand = [getCard(), getCard()];
       dealerHand = [getCard(), getCard()];
       document.getElementById("message").textContent = "";
-      updateUI();
+
+      // Reset buttons
+      document.querySelector("button[onclick='hit()']").style.display = "inline-block";
+      document.querySelector("button[onclick='stand()']").style.display = "inline-block";
+      document.getElementById("play-again").style.display = "none";
+
+      updateUI(false);
 
       if (getTotal(playerHand) === 21) {
         credits += currentBet * 2.5;
-        document.getElementById("message").textContent = "Blackjack! You win!";
-        playerHand = [];
-        dealerHand = [];
-        updateUI();
+        endRound("Blackjack! You win!");
       }
     }
 
     function hit() {
       if (playerHand.length === 0) return;
       playerHand.push(getCard());
-      updateUI();
+      updateUI(false);
       if (getTotal(playerHand) > 21) {
-        document.getElementById("message").textContent = "Bust! You lose.";
-        playerHand = [];
-        dealerHand = [];
-        updateUI();
+        endRound("Bust! You lose.");
       }
     }
 
@@ -177,10 +183,17 @@
         result = "Dealer wins!";
       }
 
-      document.getElementById("message").textContent = result;
+      endRound(result);
+    }
+
+    function endRound(message) {
+      document.getElementById("message").textContent = message;
+      document.querySelector("button[onclick='hit()']").style.display = "none";
+      document.querySelector("button[onclick='stand()']").style.display = "none";
+      document.getElementById("play-again").style.display = "inline-block";
+      updateUI(true);
       playerHand = [];
       dealerHand = [];
-      updateUI();
     }
 
     updateUI();
