@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Plinko</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Roboto Mono', monospace;
+      background: linear-gradient(1deg, #0f2027, #203a43, #2c5364);
+      color: white;
+      text-align: center;
+    }
+    #game-area {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 16px;
+      padding: 20px;
+      max-width: 420px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.6);
+    }
+    canvas {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      display: block;
+      margin: 15px auto;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background-color: #1abc9c;
+      color: white;
+      transition: background 0.3s ease;
+      margin: 5px;
+    }
+    button:hover {
+      background-color: #16a085;
+    }
+    input[type="number"], input[type="checkbox"], input[type="range"] {
+      padding: 6px;
+      border-radius: 6px;
+      font-size: 16px;
+      text-align: center;
+      border: none;
+    }
+    label {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+    }
+    #score, #credits, #message, #stats {
+      font-size: 1.1rem;
+      margin: 8px 0;
+    }
+    #message {
+      height: 1.2em;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-area">
+    <h1>🎯 Plinko</h1>
+    <p id="credits">Credits: 100</p>
+    <p>Bet: <input type="number" id="bet" value="10" min="1" /></p>
+    <label>
+      <input type="checkbox" id="auto" onchange="toggleAuto()"> Auto Mode
+    </label>
+    <label>
+      Speed: <input type="range" id="speedSlider" min="10" max="1000" value="500" step="100">
+      <span id="speedDisplay">500</span>ms
+    </label>
+    <p id="score">Balls Dropped: 0</p>
+    <p id="stats">Wins: 0 | Losses: 0 | Win %: 0%</p>
+    <p id="message"></p>
+    <canvas id="plinko" width="360" height="500"></canvas>
+    <button onclick="dropBall()">Drop Ball</button>
+    <button onclick="resetGame()" id="resetBtn" style="display:none;">Reset Game</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("plinko");
+    const ctx = canvas.getContext("2d");
+
+    const PEG_RADIUS = 4;
+    const BALL_RADIUS = 6;
+    const ROWS = 8;
+    const COLS = 9;
+    const BIN_HEIGHT = 40;
+
+    const bins = Array(COLS).fill(0);
+    const binScores = [0, 0.5, 1, 2, 5, 2, 1, 0.5, 0];
+    const pegs = [];
+    const balls = [];
+    const particles = [];
+
+    let totalBalls = 0;
+    let credits = 100;
+    let winCount = 0;
+    let lossCount = 0;
+    let autoInterval = null;
+
+    class Ball {
+      constructor(x, betAmount) {
+        this.x = x;
+        this.y = 0;
+        this.vx = 0;
+        this.vy = 2;
+        this.bet = betAmount;
+      }
+
+      update() {
+        this.vy += 0.05;
+        this.x += this.vx;
+        this.y += this.vy;
+
+        if (this.x < BALL_RADIUS || this.x > canvas.width - BALL_RADIUS) {
+          this.vx *= -0.6;
+        }
+
+        for (let peg of pegs) {
+          const dx = this.x - peg.x;
+          const dy = this.y - peg.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < PEG_RADIUS + BALL_RADIUS) {
+            const angle = Math.atan2(dy, dx);
+            this.vx += Math.cos(angle) * 0.8;
+            this.vy += Math.sin(angle) * 0.8;
+          }
+        }
+
+        if (this.y > canvas.height - BIN_HEIGHT - BALL_RADIUS) {
+          const binIndex = Math.floor(this.x / (canvas.width / bins.length));
+          bins[binIndex]++;
+          const winAmount = binScores[binIndex] * this.bet;
+          credits += winAmount;
+          totalBalls++;
+
+          if (winAmount > 0) {
+            winCount++;
+            for (let i = 0; i < 20; i++) {
+              particles.push(new Particle(this.x, this.y));
+            }
+            showMessage(`🪙 +${winAmount} coins!`);
+          } else {
+            lossCount++;
+            showMessage("😢 No win");
+          }
+
+          updateDisplay();
+          return true;
+        }
+
+        return false;
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, BALL_RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = "white";
+        ctx.fill();
+      }
+    }
+
+    class Particle {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 4;
+        this.vy = (Math.random() - 0.5) * 4;
+        this.alpha = 1;
+        this.color = `hsl(${Math.random() * 360}, 100%, 60%)`;
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.alpha -= 0.02;
+        return this.alpha <= 0;
+      }
+
+      draw() {
+        ctx.globalAlpha = this.alpha;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function createPegs() {
+      const spacingX = canvas.width / COLS;
+      const spacingY = (canvas.height - BIN_HEIGHT) / (ROWS + 1);
+
+      for (let row = 0; row < ROWS; row++) {
+        for (let col = 0; col < COLS - (row % 2); col++) {
+          const x = spacingX / 2 + col * spacingX + (row % 2) * spacingX / 2;
+          const y = spacingY + row * spacingY;
+          pegs.push({ x, y });
+        }
+      }
+    }
+
+    function drawPegs() {
+      ctx.fillStyle = "#ccc";
+      for (let peg of pegs) {
+        ctx.beginPath();
+        ctx.arc(peg.x, peg.y, PEG_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawBins() {
+      const binWidth = canvas.width / bins.length;
+      for (let i = 0; i < bins.length; i++) {
+        ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+        ctx.fillRect(i * binWidth, canvas.height - BIN_HEIGHT, binWidth, BIN_HEIGHT);
+        ctx.fillStyle = "#fff";
+        ctx.font = "12px Roboto Mono";
+        ctx.fillText(`x${binScores[i]}`, i * binWidth + binWidth / 2 - 10, canvas.height - 10);
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawPegs();
+      drawBins();
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const done = particles[i].update();
+        particles[i].draw();
+        if (done) particles.splice(i, 1);
+      }
+
+      for (let i = balls.length - 1; i >= 0; i--) {
+        const done = balls[i].update();
+        balls[i].draw();
+        if (done) balls.splice(i, 1);
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    function dropBall() {
+      const betInput = document.getElementById("bet");
+      const bet = parseInt(betInput.value);
+      if (isNaN(bet) || bet <= 0 || bet > credits) {
+        showMessage("⚠️ Invalid bet.");
+        return;
+      }
+
+      credits -= bet;
+      const randX = Math.random() * (canvas.width - BALL_RADIUS * 2) + BALL_RADIUS;
+      balls.push(new Ball(randX, bet));
+      updateDisplay();
+
+      if (credits <= 0) {
+        stopAuto();
+        document.getElementById("resetBtn").style.display = "inline-block";
+        showMessage("💸 Out of credits! Click Reset.");
+      }
+    }
+
+    function toggleAuto() {
+      const auto = document.getElementById("auto").checked;
+      const speed = parseInt(document.getElementById("speedSlider").value);
+      if (auto) {
+        autoInterval = setInterval(() => {
+          if (credits <= 0) {
+            stopAuto();
+            document.getElementById("resetBtn").style.display = "inline-block";
+            return;
+          }
+          dropBall();
+        }, speed);
+      } else {
+        stopAuto();
+      }
+    }
+
+    function stopAuto() {
+      document.getElementById("auto").checked = false;
+      if (autoInterval) {
+        clearInterval(autoInterval);
+        autoInterval = null;
+      }
+    }
+
+    function updateDisplay() {
+      document.getElementById("credits").textContent = `Credits: ${credits}`;
+      document.getElementById("score").textContent = `Balls Dropped: ${totalBalls}`;
+      document.getElementById("speedDisplay").textContent = document.getElementById("speedSlider").value;
+
+      const total = winCount + lossCount;
+      const winPercent = total ? ((winCount / total) * 100).toFixed(1) : "0";
+      document.getElementById("stats").textContent = `Wins: ${winCount} | Losses: ${lossCount} | Win %: ${winPercent}%`;
+    }
+
+    function showMessage(msg) {
+      const el = document.getElementById("message");
+      el.textContent = msg;
+      el.style.color = msg.includes("+") ? "lime" : msg.includes("⚠️") ? "yellow" : "red";
+    }
+
+    function resetGame() {
+      credits = 100;
+      totalBalls = 0;
+      winCount = 0;
+      lossCount = 0;
+      updateDisplay();
+      document.getElementById("resetBtn").style.display = "none";
+      showMessage("");
+    }
+
+    document.getElementById("speedSlider").addEventListener("input", () => {
+      document.getElementById("speedDisplay").textContent = document.getElementById("speedSlider").value;
+      if (document.getElementById("auto").checked) {
+        stopAuto();
+        toggleAuto(); // restart with new speed
+      }
+    });
+
+    createPegs();
+    draw();
+    updateDisplay();
+  </script>
+</body>
+</html>
