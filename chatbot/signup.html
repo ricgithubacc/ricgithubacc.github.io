@@ -3,15 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Chat Bot</title>
+  <title>Create Account</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body data-page="login">
+<body data-page="signup">
   <div class="neural-background">
-    <div class="neural-node"></div>
-    <div class="neural-node"></div>
-    <div class="neural-node"></div>
-    <div class="neural-node"></div>
+    <div class="neural-node"></div><div class="neural-node"></div>
+    <div class="neural-node"></div><div class="neural-node"></div>
     <div class="neural-node"></div>
   </div>
 
@@ -34,22 +32,22 @@
             <div class="ring ring-3"></div>
           </div>
         </div>
-        <h1>Welcome</h1>
-        <p>Please sign in to continue</p>
+        <h1>Create Account</h1>
+        <p>Sign up to get started</p>
       </div>
 
-      <!-- Your existing login form (IDs preserved) -->
-      <form class="login-form" id="loginForm" novalidate>
+      <!-- Sign Up form (same smart-field styling) -->
+      <form class="login-form" id="signupForm" novalidate>
         <div class="smart-field" data-field="email">
           <div class="field-background"></div>
-          <input type="email" id="email" name="email" required autocomplete="email">
+          <input type="email" id="email" name="email" required autocomplete="email" placeholder=" ">
           <label for="email">Email Address</label>
           <span class="error-message" id="emailError"></span>
         </div>
 
         <div class="smart-field" data-field="password">
           <div class="field-background"></div>
-          <input type="password" id="password" name="password" required autocomplete="current-password">
+          <input type="password" id="password" name="password" required autocomplete="new-password" placeholder=" ">
           <label for="password">Password</label>
           <button type="button" class="smart-toggle" id="passwordToggle" aria-label="Toggle password visibility">
             <svg class="toggle-show" width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -62,11 +60,9 @@
           <span class="error-message" id="passwordError"></span>
         </div>
 
-        <div class="form-options"></div>
-
         <button type="submit" class="neural-button">
           <div class="button-bg"></div>
-          <span class="button-text">Sign In</span>
+          <span class="button-text">Create Account</span>
           <div class="button-loader">
             <div class="neural-spinner">
               <div class="spinner-segment"></div>
@@ -79,8 +75,8 @@
       </form>
 
       <div class="signup-section">
-        <span>Don't have an account? </span>
-        <a href="signup.html" class="neural-signup">Create one</a>
+        <span>Already have an account? </span>
+        <a href="index.html" class="neural-login">Sign in</a>
       </div>
 
       <div class="success-neural" id="successMessage">
@@ -94,13 +90,12 @@
             <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
-        <h3>Sign In Successful</h3>
+        <h3>Account Created</h3>
         <p>Redirecting</p>
       </div>
     </div>
   </div>
 
-  <!-- Load your JS as a module so Firebase imports work -->
   <script src="script.js" type="module"></script>
 </body>
 </html>

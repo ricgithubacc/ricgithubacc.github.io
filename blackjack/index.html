@@ -10,6 +10,8 @@
       animation: drawCard 0.3s ease;
       margin: 0 5px;
       vertical-align: middle;
+      max-width: 100%;
+      height: auto;
     }
 
     @keyframes drawCard {
@@ -68,8 +70,13 @@
       transition: background 0.3s ease;
     }
 
-    button:hover {
+    button:hover:not(:disabled) {
       background-color: #16a085;
+    }
+
+    button:disabled {
+      background-color: #7f8c8d;
+      cursor: not-allowed;
     }
 
     input[type=number] {
@@ -84,6 +91,14 @@
     p {
       font-size: 1.1rem;
     }
+
+    .win {
+      color: #2ecc71;
+    }
+
+    .lose {
+      color: #e74c3c;
+    }
   </style>
 </head>
 <body>
@@ -92,7 +107,7 @@
     <p>Credits: <span id="credits">100</span></p>
     <p>
       Bet: <input type="number" id="bet" value="10" min="1" />
-      <button onclick="startGame()">Deal</button>
+      <button id="deal-button" onclick="startGame()">Deal</button>
     </p>
 
     <p>Your Hand: <span id="player-total">0</span></p>
@@ -101,11 +116,14 @@
     <p>Dealer's Hand: <span id="dealer-total">0</span></p>
     <div id="dealer-hand" class="hand-row"></div>
 
-    <button onclick="hit()">Hit</button>
-    <button onclick="stand()">Stand</button>
+    <button id="hit-button" onclick="hit()">Hit</button>
+    <button id="stand-button" onclick="stand()">Stand</button>
     <button id="play-again" style="display:none;" onclick="startGame()">Play Again</button>
     <p id="message"></p>
   </div>
+
+  <!-- Optional: Card sound -->
+  <audio id="card-sound" src="card-draw.mp3" preload="auto"></audio>
 
   <script>
     let credits = parseInt(localStorage.getItem("credits")) || 100;
@@ -115,14 +133,15 @@
 
     function getCard() {
       const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-      const suits = ['S', 'H', 'D', 'C']; // Spades, Hearts, Diamonds, Clubs
+      const suits = ['S', 'H', 'D', 'C'];
       const value = values[Math.floor(Math.random() * values.length)];
       const suit = suits[Math.floor(Math.random() * suits.length)];
-      return `${value}${suit}`; // e.g., "10H", "AS"
+      document.getElementById("card-sound").play().catch(() => {});
+      return `${value}${suit}`;
     }
 
     function cardToImg(card) {
-      const code = card.replace("10", "0"); // API uses 0 for 10
+      const code = card.replace("10", "0");
       return `<img class="animate-card" src="https://deckofcardsapi.com/static/img/${code}.png" width="60" />`;
     }
 
@@ -130,7 +149,7 @@
       let total = 0;
       let aces = 0;
       hand.forEach(card => {
-        let value = card.slice(0, -1); // remove suit
+        let value = card.slice(0, -1);
         if (['J', 'Q', 'K'].includes(value)) {
           total += 10;
         } else if (value === 'A') {
@@ -165,13 +184,21 @@
       }
 
       document.getElementById("player-total").textContent = getTotal(playerHand);
+      document.getElementById("deal-button").disabled = credits <= 0;
       localStorage.setItem("credits", credits);
+    }
+
+    function setControlsDuringGame(inGame) {
+      document.getElementById("hit-button").style.display = inGame ? "inline-block" : "none";
+      document.getElementById("stand-button").style.display = inGame ? "inline-block" : "none";
+      document.getElementById("deal-button").disabled = inGame;
     }
 
     function startGame() {
       currentBet = parseInt(document.getElementById("bet").value) || 10;
       if (currentBet > credits) {
         document.getElementById("message").textContent = "Not enough credits!";
+        document.getElementById("message").className = "lose";
         return;
       }
 
@@ -179,16 +206,16 @@
       playerHand = [getCard(), getCard()];
       dealerHand = [getCard(), getCard()];
       document.getElementById("message").textContent = "";
+      document.getElementById("message").className = "";
 
-      document.querySelector("button[onclick='hit()']").style.display = "inline-block";
-      document.querySelector("button[onclick='stand()']").style.display = "inline-block";
+      setControlsDuringGame(true);
       document.getElementById("play-again").style.display = "none";
 
       updateUI(false);
 
       if (getTotal(playerHand) === 21) {
         credits += currentBet * 2.5;
-        endRound("Blackjack! You win!");
+        endRound("Blackjack! You win!", true);
       }
     }
 
@@ -197,7 +224,7 @@
       playerHand.push(getCard());
       updateUI(false);
       if (getTotal(playerHand) > 21) {
-        endRound("Bust! You lose.");
+        endRound("Bust! You lose.", false);
       }
     }
 
@@ -210,10 +237,12 @@
       const playerTotal = getTotal(playerHand);
       const dealerTotal = getTotal(dealerHand);
       let result = "";
+      let win = false;
 
       if (dealerTotal > 21 || playerTotal > dealerTotal) {
         credits += currentBet * 2;
         result = "You win!";
+        win = true;
       } else if (playerTotal === dealerTotal) {
         credits += currentBet;
         result = "Push!";
@@ -221,20 +250,30 @@
         result = "Dealer wins!";
       }
 
-      endRound(result);
+      endRound(result, win);
     }
 
-    function endRound(message) {
-      document.getElementById("message").textContent = message;
-      document.querySelector("button[onclick='hit()']").style.display = "none";
-      document.querySelector("button[onclick='stand()']").style.display = "none";
+    function endRound(message, isWin) {
+      const msg = document.getElementById("message");
+      msg.textContent = message;
+      msg.className = isWin ? "win" : message.includes("Push") ? "" : "lose";
+
+      setControlsDuringGame(false);
       document.getElementById("play-again").style.display = "inline-block";
       updateUI(true);
+
       playerHand = [];
       dealerHand = [];
+
+      if (credits <= 0) {
+        msg.textContent = "Game over! You're out of credits.";
+        msg.className = "lose";
+        document.getElementById("deal-button").disabled = true;
+      }
     }
 
     updateUI();
+    setControlsDuringGame(false);
   </script>
 </body>
 </html>

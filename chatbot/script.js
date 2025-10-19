@@ -12,8 +12,7 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// 1) REPLACE with your Firebase Console values (Project settings → Web app).
-//    Keep projectId matching your project exactly.
+// 1) FILL THESE FROM Firebase Console → Project settings → Web app
 const firebaseConfig = {
     apiKey: "AIzaSyC2c5wDZDSjJT_08vUyb6P6i0Ry2bGHTZk",
     authDomain: "webchatbot-df69c.firebaseapp.com",
@@ -21,187 +20,170 @@ const firebaseConfig = {
     appId: "1:400213955287:web:f8e3b8c1fc220a41ee5692",
   };
 
-// 2) Init + persist session across reloads
+// 2) Init + keep session across reloads
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 await setPersistence(auth, browserLocalPersistence);
 
-// ---------- Grab your existing UI ----------
-const form            = document.getElementById("loginForm");
-const emailInput      = document.getElementById("email");
-const passwordInput   = document.getElementById("password");
-const passwordToggle  = document.getElementById("passwordToggle");
-const createLink      = document.querySelector(".neural-signup");   // “Create one”
-const successBox      = document.getElementById("successMessage");
-const emailErrorEl    = document.getElementById("emailError");
-const passwordErrorEl = document.getElementById("passwordError");
+// 3) GitHub Pages path helper (adjust REPO if using a project site)
+const REPO = "YOUR_REPO_NAME"; // e.g., "chatbot"  ← change this!
+const isGH = location.hostname.endsWith("github.io");
+const BASE = isGH ? `/${REPO}/` : "/";
 
-// (Optional) If you added these elsewhere in your page/app:
-const signOutBtn      = document.getElementById("signOutBtn");
-const resetBtn        = document.getElementById("resetBtn");
+function go(path) {
+  // normalize without duplicating slashes
+  const href = (BASE + path).replace(/\/{2,}/g, "/");
+  window.location.href = href;
+}
+function here(path) {
+  const url = new URL(window.location.href);
+  return url.pathname.endsWith(path);
+}
 
-// ---------- Small helpers ----------
+// Shared helpers for inline errors (works with your smart-field styles)
+const $ = (sel) => document.querySelector(sel);
 function setInlineError(which, msg) {
-  const fieldId = which === "email" ? "email" : "password";
-  const smartField = document.getElementById(fieldId)?.closest(".smart-field");
-  const el = which === "email" ? emailErrorEl : passwordErrorEl;
-  if (smartField) smartField.classList.add("error");
-  if (el) {
-    el.textContent = msg || "";
-    el.classList.toggle("show", !!msg);
-  }
+  const id = which === "email" ? "email" : "password";
+  const field = document.getElementById(id)?.closest(".smart-field");
+  const err = document.getElementById(which === "email" ? "emailError" : "passwordError");
+  if (field) field.classList.toggle("error", !!msg);
+  if (err) { err.textContent = msg || ""; err.classList.toggle("show", !!msg); }
 }
 function clearErrors() {
-  ["email","password"].forEach((w) => {
+  ["email","password"].forEach((w)=>{
     const field = document.getElementById(w)?.closest(".smart-field");
     if (field) field.classList.remove("error");
   });
-  if (emailErrorEl)    { emailErrorEl.textContent = "";    emailErrorEl.classList.remove("show"); }
-  if (passwordErrorEl) { passwordErrorEl.textContent = ""; passwordErrorEl.classList.remove("show"); }
+  ["emailError","passwordError"].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) { el.textContent = ""; el.classList.remove("show"); }
+  });
 }
 function mapAuthError(e) {
   const code = e?.code || "";
   switch (code) {
-    case "auth/invalid-email":        return ["email",    "Invalid email address."];
-    case "auth/email-already-in-use": return ["email",    "An account already exists for this email."];
-    case "auth/weak-password":        return ["password", "Use a stronger password (8+ chars)."];
+    case "auth/invalid-email":        return ["email","Invalid email address."];
+    case "auth/email-already-in-use": return ["email","An account already exists for this email."];
+    case "auth/weak-password":        return ["password","Use a stronger password (8+ chars)."];
     case "auth/user-not-found":
-    case "auth/wrong-password":       return ["password", "Incorrect email or password."];
-    case "auth/too-many-requests":    return ["password", "Too many attempts. Try again later."];
+    case "auth/wrong-password":       return ["password","Incorrect email or password."];
+    case "auth/too-many-requests":    return ["password","Too many attempts. Try again later."];
     default:                          return ["password", e?.message || "Authentication error."];
   }
 }
-function validateEmail() {
-  const v = emailInput.value.trim();
-  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-  if (!v) { setInlineError("email","Email address required"); return false; }
-  if (!ok){ setInlineError("email","Invalid email format detected"); return false; }
-  setInlineError("email","");
-  return true;
-}
-function validatePassword() {
-  const p = passwordInput.value;
-  if (!p)           { setInlineError("password","Password required"); return false; }
-  if (p.length < 6) { setInlineError("password","Password must be at least 6 characters"); return false; }
-  setInlineError("password","");
-  return true;
-}
+function attachCommonFieldUX() {
+  const email = document.getElementById("email");
+  const pass  = document.getElementById("password");
+  const toggle = document.getElementById("passwordToggle");
+  if (!email || !pass) return;
 
-// Fancy success transition you already used
+  email.setAttribute("placeholder"," ");
+  pass.setAttribute("placeholder"," ");
+
+  email.addEventListener("input", () => setInlineError("email",""));
+  pass.addEventListener("input",  () => setInlineError("password",""));
+  email.addEventListener("blur",  () => { if (!email.value.trim()) setInlineError("email","Email address required"); });
+  pass.addEventListener("blur",   () => { if (!pass.value) setInlineError("password","Password required"); });
+
+  toggle?.addEventListener("click", ()=>{
+    const type = pass.type === "password" ? "text" : "password";
+    pass.type = type;
+    toggle.classList.toggle("toggle-active", type === "text");
+  });
+}
 function showNeuralSuccess() {
-  // Hide form with neural transition
+  const form = document.querySelector("form.login-form");
+  const successBox = document.getElementById("successMessage");
+  if (!form || !successBox) return;
   form.style.transform = "scale(0.95)";
   form.style.opacity = "0";
-
   setTimeout(() => {
     form.style.display = "none";
-    const social = document.querySelector(".neural-social");
-    const signupSection = document.querySelector(".signup-section");
-    const sep = document.querySelector(".auth-separator");
-    if (social) social.style.display = "none";
-    if (signupSection) signupSection.style.display = "none";
-    if (sep) sep.style.display = "none";
-    // Show your “Connected” success
-    successBox?.classList.add("show");
+    document.querySelector(".neural-social")?.remove();
+    document.querySelector(".signup-section")?.remove();
+    document.querySelector(".auth-separator")?.remove();
+    successBox.classList.add("show");
   }, 300);
-
-  // After success, reveal your app (or redirect) — customize as you like
-  setTimeout(() => {
-    document.body.classList.add("authed");
-    // window.location.href = "/app.html";
-  }, 1200);
 }
 
-// ---------- Wire up your existing controls ----------
+// ---------- Page-specific wiring ----------
+const page = document.body.dataset.page; // "login" | "signup" | "app"
 
-// label animations keep your placeholders empty
-emailInput.setAttribute("placeholder"," ");
-passwordInput.setAttribute("placeholder"," ");
-
-// Live validation UX
-emailInput.addEventListener("blur",  validateEmail);
-passwordInput.addEventListener("blur", validatePassword);
-emailInput.addEventListener("input", () => setInlineError("email",""));
-passwordInput.addEventListener("input", () => setInlineError("password",""));
-
-// Show/hide password
-passwordToggle?.addEventListener("click", () => {
-  const type = passwordInput.type === "password" ? "text" : "password";
-  passwordInput.type = type;
-  passwordToggle.classList.toggle("toggle-active", type === "text");
-});
-
-// Submit = SIGN IN (uses current email/password fields)
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  clearErrors();
-  if (!validateEmail() || !validatePassword()) return;
-
-  // Button loading state
-  const submitBtn = form.querySelector(".neural-button");
-  submitBtn?.classList.add("loading");
-  if (submitBtn) submitBtn.disabled = true;
-
-  try {
-    await signInWithEmailAndPassword(auth, emailInput.value.trim(), passwordInput.value);
-    showNeuralSuccess();
-  } catch (err) {
-    const [where, msg] = mapAuthError(err);
-    setInlineError(where, msg);
-  } finally {
-    submitBtn?.classList.remove("loading");
-    if (submitBtn) submitBtn.disabled = false;
-  }
-});
-
-// “Create one” link = REGISTER with current email/password
-createLink?.addEventListener("click", async (e) => {
-  e.preventDefault();
-  clearErrors();
-  if (!validateEmail() || !validatePassword()) return;
-
-  try {
-    await createUserWithEmailAndPassword(auth, emailInput.value.trim(), passwordInput.value);
-    showNeuralSuccess();
-  } catch (err) {
-    const [where, msg] = mapAuthError(err);
-    setInlineError(where, msg);
-  }
-});
-
-// Optional: “Forgot password?” if you add a link with id="forgotLink"
-const forgotLink = document.getElementById("forgotLink");
-forgotLink?.addEventListener("click", async (e) => {
-  e.preventDefault();
-  clearErrors();
-  const email = emailInput.value.trim();
-  if (!email) { setInlineError("email","Enter your email first."); return; }
-  try {
-    await sendPasswordResetEmail(auth, email);
-    setInlineError("email","Password reset email sent. Check your inbox.");
-  } catch (err) {
-    const [where, msg] = mapAuthError(err);
-    setInlineError(where, msg);
-  }
-});
-
-// Optional: a Sign Out button elsewhere in your app
-signOutBtn?.addEventListener("click", async () => {
-  await signOut(auth);
-  // Reset UI back to login
-  if (successBox) successBox.classList.remove("show");
-  form.style.display = "";
-  form.style.opacity = "1";
-  form.style.transform = "none";
-  document.body.classList.remove("authed");
-});
-
-// Keep UI in sync with auth state (e.g., page refresh)
+// Redirect rules based on auth state
 onAuthStateChanged(auth, (user) => {
-  if (user) {
-    // Already signed-in (refresh) → show app
-    document.body.classList.add("authed");
-  } else {
-    document.body.classList.remove("authed");
+  if (page === "login" || page === "signup") {
+    // If already signed-in and we’re on auth pages, go to app
+    if (user && !here("app.html")) go("app.html");
+  } else if (page === "app") {
+    // If not signed-in, bounce to login
+    if (!user && !here("index.html")) go("index.html");
   }
 });
+
+// LOGIN page: sign in submit
+if (page === "login") {
+  attachCommonFieldUX();
+  const form = document.getElementById("loginForm");
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearErrors();
+    const email = $("#email")?.value.trim();
+    const pass  = $("#password")?.value;
+    if (!email) { setInlineError("email","Email address required"); return; }
+    if (!pass)  { setInlineError("password","Password required"); return; }
+
+    const submitBtn = form.querySelector(".neural-button");
+    submitBtn?.classList.add("loading");
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+      showNeuralSuccess();
+      setTimeout(()=> go("app.html"), 1000);
+    } catch (err) {
+      const [where, msg] = mapAuthError(err);
+      setInlineError(where, msg);
+    } finally {
+      submitBtn?.classList.remove("loading");
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+}
+
+// SIGNUP page: create account submit
+if (page === "signup") {
+  attachCommonFieldUX();
+  const form = document.getElementById("signupForm");
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearErrors();
+    const email = $("#email")?.value.trim();
+    const pass  = $("#password")?.value;
+    if (!email) { setInlineError("email","Email address required"); return; }
+    if (!pass || pass.length < 6) { setInlineError("password","Password must be at least 6 characters"); return; }
+
+    const submitBtn = form.querySelector(".neural-button");
+    submitBtn?.classList.add("loading");
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      await createUserWithEmailAndPassword(auth, email, pass);
+      showNeuralSuccess();
+      setTimeout(()=> go("app.html"), 1000);
+    } catch (err) {
+      const [where, msg] = mapAuthError(err);
+      setInlineError(where, msg);
+    } finally {
+      submitBtn?.classList.remove("loading");
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+}
+
+// APP page: sign out
+if (page === "app") {
+  document.getElementById("signOutBtn")?.addEventListener("click", async () => {
+    await signOut(auth);
+    go("index.html");
+  });
+}
