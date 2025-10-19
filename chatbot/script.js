@@ -26,7 +26,7 @@ const auth = getAuth(app);
 await setPersistence(auth, browserLocalPersistence);
 
 // 3) GitHub Pages path helper (adjust REPO if using a project site)
-const REPO = "YOUR_REPO_NAME"; // e.g., "chatbot"  ← change this!
+const REPO = ""; // e.g., "chatbot"  ← change this!
 const isGH = location.hostname.endsWith("github.io");
 const BASE = isGH ? `/${REPO}/` : "/";
 
