@@ -25,10 +25,21 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 await setPersistence(auth, browserLocalPersistence);
 
-// 3) GitHub Pages path helper (adjust REPO if using a project site)
-const REPO = ""; // e.g., "chatbot"  ← change this!
-const isGH = location.hostname.endsWith("github.io");
-const BASE = isGH ? `/${REPO}/` : "/";
+// Custom domain + app under /chatbot
+const REPO = "";            // not used for custom domain
+const BASE = "/chatbot/";  // <-- key line
+
+function go(path) {
+  // e.g., go("app.html") -> /chatbot/app.html
+  window.location.href = (BASE + path).replace(/\/{2,}/g, "/");
+}
+
+// helper used by the auth guard
+function here(file) {
+  const p = location.pathname;
+  if (file === "index.html") return /\/chatbot\/?$/.test(p) || p.endsWith("/chatbot/index.html");
+  return p.endsWith("/chatbot/" + file);
+}
 
 function go(path) {
   // normalize without duplicating slashes
