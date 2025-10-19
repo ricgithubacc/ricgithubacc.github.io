@@ -27,28 +27,19 @@ await setPersistence(auth, browserLocalPersistence);
 
 // Custom domain + app under /chatbot
 const REPO = "";            // not used for custom domain
-const BASE = "/chatbot/";  // <-- key line
+// ----- App lives under /chatbot -----
+const BASE = "/chatbot/";
 
 function go(path) {
-  // e.g., go("app.html") -> /chatbot/app.html
+  // go("app.html") -> /chatbot/app.html
   window.location.href = (BASE + path).replace(/\/{2,}/g, "/");
 }
 
-// helper used by the auth guard
 function here(file) {
+  // helps guards detect current page even for /chatbot
   const p = location.pathname;
   if (file === "index.html") return /\/chatbot\/?$/.test(p) || p.endsWith("/chatbot/index.html");
   return p.endsWith("/chatbot/" + file);
-}
-
-function go(path) {
-  // normalize without duplicating slashes
-  const href = (BASE + path).replace(/\/{2,}/g, "/");
-  window.location.href = href;
-}
-function here(path) {
-  const url = new URL(window.location.href);
-  return url.pathname.endsWith(path);
 }
 
 // Shared helpers for inline errors (works with your smart-field styles)
