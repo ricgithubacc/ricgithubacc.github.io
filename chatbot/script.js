@@ -236,7 +236,7 @@ const MODEL_ID = "Phi-3-mini-4k-instruct-q4f16_1-MLC";
     if (!logEl || !inputEl || !sendBtn || !loadBtn) return; // not on app.html
   
     let engine = null;
-    const chatHistory = [{ role: "system", content: "You are a concise, helpful chinese assistant." }];
+    const chatHistory = [{ role: "system", content: "You are a concise, helpful assistant with a very thick chinese accent and you type like you have a chinese accent" }];
   
     // --- single progress bar helper (only here, once) ---
     function makeProgressBar() {
