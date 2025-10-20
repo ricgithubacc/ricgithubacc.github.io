@@ -113,10 +113,14 @@ app.post('/chat', verifyAuth, async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   // Keepalive ping so proxies don't time out long-running streams
+  // Send an immediate no-op so the client sees activity
+  res.write('event: ready\ndata: {}\n\n');
+
+  // Keep the HTTP stream active every 15s while waiting on upstream
   const keepalive = setInterval(() => {
     try {
       res.write(':\n\n');
-    } catch (_) {}
+    } catch {}
   }, 15000);
 
   try {
@@ -213,6 +217,7 @@ app.post('/chat', verifyAuth, async (req, res) => {
 
     res.write('event: done\ndata: {}\n\n');
     res.end();
+    clearInterval(keepalive);
   } catch (e) {
     console.error('Handler error:', e);
     res.write(`event: error\ndata: ${JSON.stringify({error: String(e && e.message || e)})}\n\n`);
@@ -228,7 +233,7 @@ app.post('/chat', verifyAuth, async (req, res) => {
 exports.api = onRequest(
     {
       region: 'us-central1',
-      timeoutSeconds: 120, // allow more time; we stream promptly to avoid GFE 504
+      timeoutSeconds: 120,
       memory: '512MiB',
       minInstances: 0,
       maxInstances: 2,

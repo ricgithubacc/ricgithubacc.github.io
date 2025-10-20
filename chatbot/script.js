@@ -127,7 +127,8 @@ if (page === "app") {
 
 // ---------------- Remote Chat (Cloud Function) ----------------
 // const endpoint = "/api/chat";
-const endpoint = "https://us-central1-webchatbot-df69c.cloudfunctions.net/api/chat";
+// script.js
+const endpoint = "https://api-mdnx4qrxza-uc.a.run.app/chat";
 
 // Load + render history saved by the server: users/{uid}/chats/main
 async function loadAndRenderChatHistory() {
@@ -190,7 +191,8 @@ async function sendPrompt() {
 
   const controller = new AbortController();
   // allow more time (cold start + long generations)
-  const timeout = setTimeout(() => controller.abort("timeout"), 120_000);
+// was 120_000
+    const timeout = setTimeout(() => controller.abort("timeout"), 180_000);
 
   let accumulated = "";
 
