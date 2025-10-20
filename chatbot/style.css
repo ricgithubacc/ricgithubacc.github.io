@@ -995,3 +995,237 @@ html, body {
     transition: width .25s ease;
   }
   
+  /* --- Floating labels that don't overlap --- */
+.smart-field {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.smart-field input {
+  width: 100%;
+  padding: 14px 44px 14px 12px;       /* right padding leaves room for eye button */
+  border-radius: 14px;
+  background: rgba(255,255,255,.05);
+  color: inherit;
+  border: 0;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
+}
+
+.smart-field label {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: rgba(255,255,255,.75);
+  transition: all .18s ease;
+  pointer-events: none;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: transparent;
+}
+
+/* Float label on focus or when the field has content */
+.smart-field:focus-within label,
+.smart-field.filled label {
+  top: -8px;
+  transform: none;
+  font-size: 11px;
+  color: rgba(255,255,255,.9);
+  background: rgba(0,0,0,.25);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+}
+
+/* --- Password eye button --- */
+.password-wrap { position: relative; }
+
+.password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.password-toggle:hover {
+  background: rgba(255,255,255,0.14);
+}
+
+/* Eye icon */
+.password-toggle::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  display: block;
+  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7"/><circle cx="12" cy="12" r="3"/></svg>') center / contain no-repeat;
+  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7"/><circle cx="12" cy="12" r="3"/></svg>') center / contain no-repeat;
+  background: currentColor;
+  color: rgba(255,255,255,.9);
+}
+
+/* Eye-off when revealing password */
+.password-toggle[aria-pressed="true"]::before {
+  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.94"/><path d="M10.58 10.58a3 3 0 0 0 4.24 4.24"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-3.52 5.11"/><line x1="1" y1="1" x2="23" y2="23"/></svg>') center / contain no-repeat;
+  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.94"/><path d="M10.58 10.58a3 3 0 0 0 4.24 4.24"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-3.52 5.11"/><line x1="1" y1="1" x2="23" y2="23"/></svg>') center / contain no-repeat;
+  background: currentColor;
+}
+
+/* ==== FIX: floating labels + eye clickability ==== */
+
+/* Keep labels floated whenever there's content OR focus OR autofill */
+.smart-field { position: relative; }
+.smart-field label{
+  position:absolute; left:12px; top:50%; transform:translateY(-50%);
+  font-size:14px; color:rgba(255,255,255,.75);
+  padding:0 6px; border-radius:6px; transition:all .18s ease;
+  pointer-events:none;           /* <— label never steals clicks */
+  z-index:0;                     /* sits under input/eye */
+  background:transparent;
+}
+.smart-field:focus-within label,
+.smart-field.filled label{
+  top:-8px; transform:none; font-size:11px;
+  color:rgba(255,255,255,.92);
+  background:rgba(0,0,0,.25);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+}
+
+/* Autofill variants keep label floated */
+input:-webkit-autofill ~ label,
+input:-internal-autofill-selected ~ label{
+  top:-8px !important; transform:none !important; font-size:11px !important;
+}
+
+/* Inputs keep text clear of the eye icon */
+.smart-field input{
+  position:relative; z-index:1;
+  padding-right:44px; /* room for eye */
+}
+
+/* Eye sits above input and is fully clickable */
+.password-wrap{ position:relative; }
+.password-toggle{
+  position:absolute; right:8px; top:50%; transform:translateY(-50%);
+  width:34px; height:34px; border:0; border-radius:10px;
+  background: rgba(255,255,255,0.08);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
+  display:grid; place-items:center; cursor:pointer;
+  z-index:2; /* <— above input text & label */
+}
+.password-toggle:hover{ background: rgba(255,255,255,0.14); }
+
+/* Eye icon (closed) */
+.password-toggle::before{
+  content:""; width:18px; height:18px; display:block;
+  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7"/><circle cx="12" cy="12" r="3"/></svg>') center/contain no-repeat;
+  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7"/><circle cx="12" cy="12" r="3"/></svg>') center/contain no-repeat;
+  background: currentColor; color: rgba(255,255,255,.92);
+}
+/* Eye icon (open) when pressed */
+.password-toggle[aria-pressed="true"]::before{
+  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.94"/><path d="M10.58 10.58a3 3 0 0 0 4.24 4.24"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-3.52 5.11"/><line x1="1" y1="1" x2="23" y2="23"/></svg>') center/contain no-repeat;
+  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.94"/><path d="M10.58 10.58a3 3 0 0 0 4.24 4.24"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-3.52 5.11"/><line x1="1" y1="1" x2="23" y2="23"/></svg>') center/contain no-repeat;
+}
+
+
+/* Floating labels that STAY up when input has text or focus */
+/* Works even when <label> comes before <input> */
+.smart-field { position: relative; margin-bottom: 16px; }
+
+/* base input */
+.smart-field input{
+  width:100%;
+  padding:14px 44px 14px 12px;              /* room for eye */
+  border:0; border-radius:14px;
+  background:rgba(255,255,255,.05);
+  color:#fff; box-shadow:inset 0 0 0 1px rgba(255,255,255,.10);
+  outline:none;
+}
+
+/* base label sits centered over input */
+.smart-field label{
+  position:absolute; left:12px; top:50%; transform:translateY(-50%);
+  font-size:14px; color:rgba(255,255,255,.75);
+  padding:0 6px; border-radius:6px;
+  transition:all .18s ease;
+  pointer-events:none; z-index:0; background:transparent;
+}
+
+/* float label when focused OR when there's content (using :has) */
+.smart-field:has(input:focus) label,
+.smart-field:has(input:not(:placeholder-shown)) label,
+.smart-field.filled label {                     /* JS fallback */
+  top:-8px; transform:none; font-size:11px;
+  color:rgba(255,255,255,.92);
+  background:rgba(0,0,0,.25);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
+}
+
+/* keep floated on autofill */
+.smart-field:has(input:-webkit-autofill) label { 
+  top:-8px; transform:none; font-size:11px;
+}
+
+/* password eye stays clickable and doesn’t cover text */
+.password-wrap{ position:relative; }
+.password-toggle{
+  position:absolute; right:8px; top:50%; transform:translateY(-50%);
+  width:34px; height:34px; border:0; border-radius:10px;
+  background:rgba(255,255,255,.08);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.10);
+  display:grid; place-items:center; cursor:pointer; z-index:2;
+}
+.password-toggle:hover{ background:rgba(255,255,255,.14); }
+.password-toggle::before{
+  content:""; width:18px; height:18px; display:block;
+  mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7"/><circle cx="12" cy="12" r="3"/></svg>') center/contain no-repeat;
+  -webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7"/><circle cx="12" cy="12" r="3"/></svg>') center/contain no-repeat;
+  background:currentColor; color:rgba(255,255,255,.92);
+}
+.password-toggle[aria-pressed="true"]::before{
+  mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.94"/><path d="M10.58 10.58a3 3 0 0 0 4.24 4.24"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-3.52 5.11"/><line x1="1" y1="1" x2="23" y2="23"/></svg>') center/contain no-repeat;
+  -webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.94"/><path d="M10.58 10.58a3 3 0 0 0 4.24 4.24"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-3.52 5.11"/><line x1="1" y1="1" x2="23" y2="23"/></svg>') center/contain no-repeat;
+}
+
+/* --- Password toggle always clickable; no overlay blocks it --- */
+.smart-field .field-background { pointer-events: none; } /* background can't eat clicks */
+.smart-field label { pointer-events: none; }             /* label can't eat clicks */
+
+.password-toggle,
+.smart-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  z-index: 5;                 /* sit above inputs/background/labels */
+}
+
+
+/* --- Center auth pages (sign-in & sign-up) --- */
+html, body { height: 100%; }
+
+body.auth-centered {
+  min-height: 100svh;            /* safe viewport units for mobile */
+  display: grid;                  /* simplest centering */
+  place-items: center;            /* centers horizontally + vertically */
+  padding: 24px;                  /* breathing room on small screens */
+}
+
+/* Keep form a nice readable width */
+body.auth-centered form {
+  width: min(560px, 92vw);
+  margin: 0 auto;
+}
