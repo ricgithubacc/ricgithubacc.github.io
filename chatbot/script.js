@@ -126,8 +126,8 @@ if (page === "app") {
 }
 
 // ---------------- Remote Chat (Cloud Function) ----------------
-// Use same-origin route; Hosting rewrites /api/** -> function to avoid CORS
-const endpoint = "/api/chat";
+// const endpoint = "/api/chat";
+const endpoint = "https://us-central1-webchatbot-df69c.cloudfunctions.net/api/chat";
 
 // Load + render history saved by the server: users/{uid}/chats/main
 async function loadAndRenderChatHistory() {
