@@ -34,7 +34,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);   // <-- MOVE here (after app)
-await setPersistence(auth, browserLocalPersistence);
 
 await setPersistence(auth, browserLocalPersistence);
 
@@ -383,57 +382,75 @@ if (user) {
     });
   
     async function sendPrompt() {
-      if (!engine) { progEl.textContent = "Load the model first."; return; }
-      const user = (inputEl.value || "").trim();
-      if (!user) return;
-      inputEl.value = "";
-      append("you", user);
-      chatHistory.push({ role: "user", content: user });
-      if (auth.currentUser) {
-        saveChatHistory(auth.currentUser.uid, chatHistory);
-      }
-  
-      setBusy(true);
-      let assistantText = "";
-      const assistantBox = document.createElement("div");
-      assistantBox.style.margin = "8px 0";
-      assistantBox.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div id="__streaming"></div>`;
-      logEl.appendChild(assistantBox);
-      const streamEl = assistantBox.querySelector("#__streaming");
-  
-      try {
-        const stream = await engine.chat.completions.create({
-          messages: chatHistory,
-          stream: true,
-          temperature: 0.7
+        const text = (inputEl.value || "").trim();   // was chatInput
+        if (!text) return;
+        inputEl.value = "";
+        append("you", text);
+      
+        const user = auth.currentUser;
+        if (!user) { append("assistant", "Please sign in first."); return; }
+      
+        const idToken = await user.getIdToken();
+      
+        setBusy(true);
+        const box = document.createElement("div");
+        box.style.margin = "8px 0";
+        box.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div id="__streaming"></div>`;
+        logEl.appendChild(box);                        // was chatLog
+        const streamEl = box.querySelector("#__streaming");
+      
+        const endpoint = "https://us-central1-webchatbot-df69c.cloudfunctions.net/api/chat";
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + idToken,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message: text, thread: "main" }),
         });
-        for await (const delta of stream) {
-          const chunk = delta?.choices?.[0]?.delta?.content ?? "";
-          assistantText += chunk;
-          streamEl.textContent = assistantText;
-          logEl.scrollTop = logEl.scrollHeight;
+      
+        if (!resp.ok || !resp.body) {
+          streamEl.textContent = "Server error.";
+          setBusy(false);
+          return;
         }
-      } catch (e) {
+      
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = "";
+      
         try {
-          const out = await engine.chat.completions.create({
-            messages: chatHistory,
-            stream: false,
-            temperature: 0.7
-          });
-          assistantText = out?.choices?.[0]?.message?.content ?? String(out);
-          streamEl.textContent = assistantText;
-        } catch (ee) {
-          streamEl.textContent = "Error: " + (ee?.message || ee);
-        }
-      } finally {
-        if (assistantText) chatHistory.push({ role: "assistant", content: assistantText });
-        if (assistantText && auth.currentUser) {
-            saveChatHistory(auth.currentUser.uid, chatHistory);
+          let done = false;
+          while (!done) {
+            const r = await reader.read();
+            done = !!r.done;
+            if (done) break;
+            const chunk = decoder.decode(r.value);
+      
+            for (const line of chunk.split("\n")) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith("data:")) continue;
+              const payload = trimmed.slice(5).trim();
+              if (payload === "[DONE]") continue;
+              try {
+                const obj = JSON.parse(payload);
+                const delta = obj?.choices?.[0]?.delta?.content || "";
+                if (delta) {
+                  accumulated += delta;
+                  streamEl.textContent = accumulated;
+                  logEl.scrollTop = logEl.scrollHeight;  // was chatLog
+                }
+              } catch (_) { /* ignore non-JSON frames */ }
+            }
           }
-          
-        setBusy(false);
+        } catch (e) {
+          streamEl.textContent = "Stream error: " + String(e);
+        } finally {
+          setBusy(false);
+        }
       }
-    }
+      
+      
   
     sendBtn.addEventListener("click", sendPrompt);
     inputEl.addEventListener("keydown", (e) => {
