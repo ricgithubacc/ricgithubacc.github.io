@@ -63,7 +63,10 @@ const firebaseConfig = {
     apiKey: "AIzaSyC2c5wDZDSjJT_08vUyb6P6i0Ry2bGHTZk",
     authDomain: "webchatbot-df69c.firebaseapp.com",
     projectId: "webchatbot-df69c",
+    storageBucket: "webchatbot-df69c.firebasestorage.app",
+    messagingSenderId: "400213955287",
     appId: "1:400213955287:web:f8e3b8c1fc220a41ee5692",
+    measurementId: "G-EFPFJG4EWH"
   };
 
 // ---- 2) Init + keep session across reloads
