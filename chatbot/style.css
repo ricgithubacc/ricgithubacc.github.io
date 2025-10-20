@@ -866,3 +866,78 @@ body {
   .smart-field[data-field="email"] .error-message { margin-left: 8px; }
   .smart-field[data-field="password"] .error-message { margin-left: 8px; }
   
+  /* === Chatbot fix pack: contrast + layout ===================== */
+/* Base colors (dark mode) */
+html, body {
+    background: #0b0f1a;           /* deep navy */
+    color: #e5e7eb;                /* light text */
+    min-height: 100%;
+  }
+  
+  /* Make the main container use the screen width sensibly */
+  .container {
+    width: min(1100px, 94vw);      /* not scrunched */
+    margin: 24px auto;
+    padding: 0 12px;
+  }
+  
+  /* Top bar spans full width of the container */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  /* Cards & borders more visible on dark bg */
+  .info-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: #e5e7eb;
+  }
+  
+  /* Muted text still readable */
+  .muted { color: #9aa4b2; }
+  
+  /* Inputs, textareas, selects: ensure white text */
+  input, textarea, select {
+    color: #e5e7eb;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.18);
+  }
+  input::placeholder,
+  textarea::placeholder { color: #a7b0bd; }
+  
+  /* Buttons: make label readable regardless of gradient */
+  .neural-button .button-text { color: #ffffff !important; }
+  
+  /* Chat area contrast + wrapping */
+  #chatLog {
+    background: rgba(255,255,255,0.04);
+    border: 1px dashed rgba(255,255,255,0.22);
+    color: #e5e7eb;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  #chatInput {
+    color: #e5e7eb;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.18);
+  }
+  
+  /* Grid tweaks so cards don't collapse too narrow */
+  .grid.two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .grid.two { grid-template-columns: 1fr; }
+  }
+  
+  /* Make the chat card breathe on small screens */
+  .info-card #chatLog { height: clamp(220px, 40vh, 420px); }
+  
+  /* Optional: ensure links are visible */
+  a { color: #93c5fd; }
+  a:hover { color: #bfdbfe; }
+  

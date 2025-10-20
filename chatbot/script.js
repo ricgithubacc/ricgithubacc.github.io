@@ -1,4 +1,3 @@
-
 // --- Firebase SDKs (ES modules) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -14,11 +13,11 @@ import {
 
 // 1) FILL THESE FROM Firebase Console → Project settings → Web app
 const firebaseConfig = {
-    apiKey: "AIzaSyC2c5wDZDSjJT_08vUyb6P6i0Ry2bGHTZk",
-    authDomain: "webchatbot-df69c.firebaseapp.com",
-    projectId: "webchatbot-df69c",
-    appId: "1:400213955287:web:f8e3b8c1fc220a41ee5692",
-  };
+  apiKey: "AIzaSyC2c5wDZDSjJT_08vUyb6P6i0Ry2bGHTZk",
+  authDomain: "webchatbot-df69c.firebaseapp.com",
+  projectId: "webchatbot-df69c", // if your real projectId is webchatbot-df69c, change it
+  appId: "1:400213955287:web:f8e3b8c1fc220a41ee5692",
+};
 
 // 2) Init + keep session across reloads
 const app = initializeApp(firebaseConfig);
@@ -68,7 +67,7 @@ function mapAuthError(e) {
     case "auth/email-already-in-use": return ["email","An account already exists for this email."];
     case "auth/weak-password":        return ["password","Use a stronger password (8+ chars)."];
     case "auth/user-not-found":
-    case "auth/wrong-password":       return ["password","Incorrect email or password."];
+    case "auth/wrong-password":       return ["password","Incorrect email or password."]; 
     case "auth/too-many-requests":    return ["password","Too many attempts. Try again later."];
     default:                          return ["password", e?.message || "Authentication error."];
   }
@@ -119,6 +118,14 @@ onAuthStateChanged(auth, (user) => {
   } else if (page === "app") {
     // If not signed-in, bounce to login
     if (!user && !here("index.html")) go("index.html");
+
+    // Fill account box (if present)
+    const emailEl = document.getElementById("userEmail");
+    const uidEl = document.getElementById("userUid");
+    if (user) {
+      if (emailEl) emailEl.textContent = user.email || "(no email)";
+      if (uidEl) uidEl.textContent = user.uid || "—";
+    }
   }
 });
 
@@ -190,18 +197,23 @@ if (page === "app") {
   });
 }
 
-// ---------------- WebLLM Chat (app page) ----------------
+// ---------------- WebLLM Chat (app page, single-model) ----------------
 import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.48";
+
+// Use the official prebuilt config so the model ID resolves
+const appConfig = webllm.prebuiltAppConfig;
+
+// Hardcode to one model (keep this ID exactly)
+const MODEL_ID = "Llama-3.2-1B-Instruct-q4f32_1-MLC";
 
 async function setupWebLLMChat() {
   const logEl = document.getElementById("chatLog");
   const inputEl = document.getElementById("chatInput");
   const sendBtn = document.getElementById("sendMsgBtn");
-  const modelSel = document.getElementById("modelSelect");
   const loadBtn = document.getElementById("loadModelBtn");
   const progEl = document.getElementById("initProgress");
 
-  if (!logEl || !inputEl || !sendBtn || !modelSel || !loadBtn) return; // not on app.html
+  if (!logEl || !inputEl || !sendBtn || !loadBtn) return; // not on app.html
 
   let engine = null;
   const chatHistory = [{ role: "system", content: "You are a concise, helpful assistant." }];
@@ -223,16 +235,16 @@ async function setupWebLLMChat() {
 
   loadBtn.addEventListener("click", async () => {
     if (engine) return;
-    const modelId = modelSel.value || "Llama-3.2-1B-Instruct-q4f32_1-MLC";
     progEl.textContent = "Downloading model… (first time can take a bit)";
     try {
-      engine = await webllm.CreateMLCEngine(modelId, {
+      engine = await webllm.CreateMLCEngine(MODEL_ID, {
+        appConfig, // <-- makes sure MODEL_ID is found
         initProgressCallback: (p) => {
           const pct = (p.progress * 100).toFixed(0);
           progEl.textContent = `${p.text} — ${pct}%`;
         }
       });
-      progEl.textContent = `Model ready: ${modelId}`;
+      progEl.textContent = `Model ready`;
       inputEl.focus();
     } catch (e) {
       progEl.textContent = "Model load failed: " + (e?.message || e);
@@ -241,7 +253,7 @@ async function setupWebLLMChat() {
   });
 
   async function sendPrompt() {
-    if (!engine) { progEl.textContent = "Load a model first."; return; }
+    if (!engine) { progEl.textContent = "Load the model first."; return; }
     const user = (inputEl.value || "").trim();
     if (!user) return;
     inputEl.value = "";
@@ -258,7 +270,6 @@ async function setupWebLLMChat() {
     const streamEl = assistantBox.querySelector("#__streaming");
 
     try {
-      // Newer WebLLM chat API:
       const stream = await engine.chat.completions.create({
         messages: chatHistory,
         stream: true,
@@ -272,7 +283,7 @@ async function setupWebLLMChat() {
         logEl.scrollTop = logEl.scrollHeight;
       }
     } catch (e) {
-      // Fallback for older versions (single-shot):
+      // Fallback for older versions (non-streaming)
       try {
         const out = await engine.chat.completions.create({
           messages: chatHistory,
@@ -301,7 +312,7 @@ async function setupWebLLMChat() {
 
 // Initialize the chat only on the app page (after your auth guard)
 if (document.body.dataset.page === "app") {
-  // optional: auto-load the smallest model for convenience:
-  // document.getElementById("loadModelBtn")?.click();
+  // Optional: auto-load the model on page open:
+  // setupWebLLMChat().then(()=> document.getElementById("loadModelBtn")?.click());
   setupWebLLMChat();
 }

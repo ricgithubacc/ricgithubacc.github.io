@@ -1,151 +1,85 @@
-<link rel="stylesheet" href="style.css" />
-<script src="script.js" type="module"></script>
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Welcome</title>
+  <title>App</title>
   <link rel="stylesheet" href="style.css" />
-  <style>
-    /* Scoped styles so they won't affect your other pages */
-    html, body { height: 100%; }
-    body[data-page="app"] {
-      color: rgb(255, 255, 255);
-      min-height: 100svh;
-      display: grid;
-      grid-template-rows: 1fr;
-    }
-    .app-root {
-      position: relative;
-      min-height: 100svh;       /* full page height */
-      display: grid;
-      place-items: center;       /* center the card */
-      padding: 24px;             /* safe padding for small screens */
-    }
-    .app-card {
-      width: min(960px, 92vw);
-      border-radius: 20px;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.04);
-      backdrop-filter: blur(6px);
-      padding: clamp(18px, 3.6vw, 28px);
-      box-shadow: 0 10px 40px rgba(0,0,0,.25);
-    }
-    .app-head {
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      margin-bottom: 12px;
-    }
-    .pill { display:inline-block; padding:6px 10px; border-radius:999px;
-            font-size:12px; border:1px solid rgba(255, 255, 255, 0.18); opacity:.9 }
-    .muted { opacity:.78 }
-    .grid {
-      display:grid; gap:12px; margin-top:16px;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    }
-    .info-card {
-      border:1px dashed rgba(255,255,255,.18);
-      border-radius:14px; padding:14px; background: rgba(255,255,255,.02);
-    }
-    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-    .spacer { height:16px; }
-    .footer-cta { margin-top:18px; display:flex; gap:12px; flex-wrap:wrap; }
-    /* Make the neural background sit behind everything */
-    .app-root .neural-background { position: absolute; inset: 0; z-index: -1; }
-  </style>
 </head>
 <body data-page="app">
-  <div class="app-root">
-    <!-- reuse your animated background -->
-    <div class="neural-background">
-      <div class="neural-node"></div>
-      <div class="neural-node"></div>
-      <div class="neural-node"></div>
-      <div class="neural-node"></div>
-      <div class="neural-node"></div>
+  <div class="container">
+    <!-- Top bar -->
+    <div class="top-bar">
+      <div class="status-dot">Signed in</div>
+      <button id="signOutBtn" class="neural-button" style="margin-left:auto; min-height:44px;">
+        <div class="button-bg"></div>
+        <span class="button-text">Sign out</span>
+        <div class="button-glow"></div>
+      </button>
     </div>
 
-    <div class="app-card">
-      <div class="app-head">
-        <div class="row">
-          <div class="pill">Signed in</div>
-        </div>
-        <button id="signOutBtn" class="neural-button">
+    <h1>Welcome <span class="wave">👋</span></h1>
+    <p class="muted">You’re successfully signed in.</p>
+
+    <div class="grid two">
+      <!-- Account card -->
+      <div class="info-card">
+        <strong>Account</strong>
+        <div class="muted" style="margin-top:8px;">Email: <span id="userEmail">(loading…)</span></div>
+        <div class="muted">UID: <span id="userUid">—</span></div>
+      </div>
+
+      <!-- Placeholder / Next step (optional) -->
+      <div class="info-card">
+        <strong>Next step</strong>
+        <div class="muted" style="margin-top:8px;">Chatbot area</div>
+      </div>
+    </div>
+
+    <!-- Chatbot (WebLLM) -->
+    <div class="spacer"></div>
+    <div class="info-card">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <strong>Chatbot</strong>
+        <button id="loadModelBtn" class="neural-button" style="padding:0 12px; min-height:36px;">
           <div class="button-bg"></div>
-          <span class="button-text">Sign out</span>
+          <span class="button-text">Load model</span>
           <div class="button-glow"></div>
         </button>
       </div>
 
-      <h1 style="margin:0 0 6px 0;">Welcome 👋</h1>
-      <p class="muted" style="margin:0 0 14px 0;">You’re successfully signed in.</p>
+      <div id="initProgress" class="muted" style="margin-top:8px; font-size:12px;"></div>
 
-      <div class="grid">
-        <div class="info-card">
-          <div class="muted" style="font-size:12px;">Account</div>
-          <div><strong id="userEmail">(loading…)</strong></div>
-          <div class="muted" style="font-size:12px; word-break:break-all;">UID: <span id="userUid">—</span></div>
-        </div>
-        <div class="info-card">
-          <div class="muted" style="font-size:12px;">Next step</div>
-          <div style="margin-top:6px;">Chatbot area (coming soon)</div>
-        </div>
-        <!-- Chatbot (WebLLM) -->
-<div class="spacer"></div>
-<div class="info-card">
-  <div class="row" style="justify-content:space-between; align-items:center;">
-    <strong>Chatbot</strong>
-    <div class="row" style="gap:8px">
-      <select id="modelSelect" class="pill" title="Choose a local model">
-        <option value="Llama-3.2-1B-Instruct-q4f32_1-MLC">Llama 3.2 1B (fastest)</option>
+      <div id="chatLog" style="margin-top:12px; height:320px; overflow:auto; padding:12px; border:1px dashed rgba(255,255,255,.18); border-radius:12px; background:rgba(255,255,255,.02)"></div>
 
-      </select>
-      <button id="loadModelBtn" class="neural-button" style="padding:0 12px; min-height:36px;">
+      <div class="row" style="margin-top:12px; gap:8px;">
+        <textarea id="chatInput" rows="2" placeholder="Type your message…" style="flex:1; resize:vertical; border-radius:10px; padding:10px; background:rgba(255,255,255,.05); color:#fff; border:1px solid rgba(255,255,255,.12)"></textarea>
+        <button id="sendMsgBtn" class="neural-button" style="min-width:120px; min-height:42px;">
+          <div class="button-bg"></div>
+          <span class="button-text">Send</span>
+          <div class="button-glow"></div>
+        </button>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- Optional nav buttons -->
+    <div class="stack" style="gap:16px;">
+      <a class="neural-button wide" href="index.html">
         <div class="button-bg"></div>
-        <span class="button-text">Load model</span>
+        <span class="button-text">Go to login</span>
         <div class="button-glow"></div>
-      </button>
+      </a>
+      <a class="neural-button wide" href="signup.html">
+        <div class="button-bg"></div>
+        <span class="button-text">Create another account</span>
+        <div class="button-glow"></div>
+      </a>
     </div>
   </div>
 
-  <div id="initProgress" class="muted" style="margin-top:8px; font-size:12px;"></div>
-
-  <div id="chatLog" style="margin-top:12px; height:320px; overflow:auto; padding:12px; border:1px dashed rgba(255,255,255,.18); border-radius:12px; background:rgba(255,255,255,.02)"></div>
-
-  <div class="row" style="margin-top:12px; gap:8px;">
-    <textarea id="chatInput" rows="2" placeholder="Type your message…" style="flex:1; resize:vertical; border-radius:10px; padding:10px; background:rgba(255,255,255,.05); color:#fff; border:1px solid rgba(255,255,255,.12)"></textarea>
-    <button id="sendMsgBtn" class="neural-button" style="min-width:120px; min-height:42px;">
-      <div class="button-bg"></div>
-      <span class="button-text">Send</span>
-      <div class="button-glow"></div>
-    </button>
-  </div>
-</div>
-
-<!-- WebLLM runtime (must be in app page) -->
-<script type="module" src="https://esm.run/@mlc-ai/web-llm@0.2.48"></script>
-
-      </div>
-
-      <div class="footer-cta">
-        <a class="neural-button" href="index.html" style="text-decoration:none;">
-          <div class="button-bg"></div>
-          <span class="button-text">Go to login</span>
-          <div class="button-glow"></div>
-        </a>
-        <a class="neural-button" href="signup.html" style="text-decoration:none;">
-          <div class="button-bg"></div>
-          <span class="button-text">Create another account</span>
-          <div class="button-glow"></div>
-        </a>
-      </div>
-    </div>
-  </div>
-
-  <!-- shared logic: auth guard + fill user info + sign out -->
-  <link rel="stylesheet" href="style.css" />
-<script src="script.js" type="module"></script>
+  <!-- IMPORTANT: Only your app script; do NOT include @mlc-ai/web-llm here -->
+  <script type="module" src="script.js"></script>
 </body>
 </html>
