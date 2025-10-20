@@ -16,7 +16,7 @@ import {
 const firebaseConfig = {
     apiKey: "AIzaSyC2c5wDZDSjJT_08vUyb6P6i0Ry2bGHTZk",
     authDomain: "webchatbot-df69c.firebaseapp.com",
-    projectId: "ebchatbot-df69c",
+    projectId: "webchatbot-df69c",
     appId: "1:400213955287:web:f8e3b8c1fc220a41ee5692",
   };
 
@@ -188,4 +188,120 @@ if (page === "app") {
     await signOut(auth);
     go("index.html");
   });
+}
+
+// ---------------- WebLLM Chat (app page) ----------------
+import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.48";
+
+async function setupWebLLMChat() {
+  const logEl = document.getElementById("chatLog");
+  const inputEl = document.getElementById("chatInput");
+  const sendBtn = document.getElementById("sendMsgBtn");
+  const modelSel = document.getElementById("modelSelect");
+  const loadBtn = document.getElementById("loadModelBtn");
+  const progEl = document.getElementById("initProgress");
+
+  if (!logEl || !inputEl || !sendBtn || !modelSel || !loadBtn) return; // not on app.html
+
+  let engine = null;
+  const chatHistory = [{ role: "system", content: "You are a concise, helpful assistant." }];
+
+  function append(role, text) {
+    const wrap = document.createElement("div");
+    wrap.style.margin = "8px 0";
+    wrap.innerHTML = `<div class="muted" style="font-size:12px">${role}</div><div>${text.replace(/</g,"&lt;")}</div>`;
+    logEl.appendChild(wrap);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function setBusy(yes) {
+    sendBtn.disabled = yes;
+    inputEl.disabled = yes;
+    loadBtn.disabled = yes;
+    sendBtn.classList.toggle("loading", yes);
+  }
+
+  loadBtn.addEventListener("click", async () => {
+    if (engine) return;
+    const modelId = modelSel.value || "Llama-3.2-1B-Instruct-q4f32_1-MLC";
+    progEl.textContent = "Downloading model… (first time can take a bit)";
+    try {
+      engine = await webllm.CreateMLCEngine(modelId, {
+        initProgressCallback: (p) => {
+          const pct = (p.progress * 100).toFixed(0);
+          progEl.textContent = `${p.text} — ${pct}%`;
+        }
+      });
+      progEl.textContent = `Model ready: ${modelId}`;
+      inputEl.focus();
+    } catch (e) {
+      progEl.textContent = "Model load failed: " + (e?.message || e);
+      engine = null;
+    }
+  });
+
+  async function sendPrompt() {
+    if (!engine) { progEl.textContent = "Load a model first."; return; }
+    const user = (inputEl.value || "").trim();
+    if (!user) return;
+    inputEl.value = "";
+    append("you", user);
+    chatHistory.push({ role: "user", content: user });
+
+    // Stream reply
+    setBusy(true);
+    let assistantText = "";
+    const assistantBox = document.createElement("div");
+    assistantBox.style.margin = "8px 0";
+    assistantBox.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div id="__streaming"></div>`;
+    logEl.appendChild(assistantBox);
+    const streamEl = assistantBox.querySelector("#__streaming");
+
+    try {
+      // Newer WebLLM chat API:
+      const stream = await engine.chat.completions.create({
+        messages: chatHistory,
+        stream: true,
+        temperature: 0.7
+      });
+
+      for await (const delta of stream) {
+        const chunk = delta?.choices?.[0]?.delta?.content ?? "";
+        assistantText += chunk;
+        streamEl.textContent = assistantText;
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+    } catch (e) {
+      // Fallback for older versions (single-shot):
+      try {
+        const out = await engine.chat.completions.create({
+          messages: chatHistory,
+          stream: false,
+          temperature: 0.7
+        });
+        assistantText = out?.choices?.[0]?.message?.content ?? String(out);
+        streamEl.textContent = assistantText;
+      } catch (ee) {
+        streamEl.textContent = "Error: " + (ee?.message || ee);
+      }
+    } finally {
+      if (assistantText) chatHistory.push({ role: "assistant", content: assistantText });
+      setBusy(false);
+    }
+  }
+
+  sendBtn.addEventListener("click", sendPrompt);
+  inputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendPrompt();
+    }
+  });
+}
+
+// Initialize the chat only on the app page (after your auth guard)
+if (document.body.dataset.page === "app") {
+  // optional: auto-load the smallest model for convenience:
+  // document.getElementById("loadModelBtn")?.click();
+  setupWebLLMChat();
 }

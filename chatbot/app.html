@@ -92,6 +92,41 @@
           <div class="muted" style="font-size:12px;">Next step</div>
           <div style="margin-top:6px;">Chatbot area (coming soon)</div>
         </div>
+        <!-- Chatbot (WebLLM) -->
+<div class="spacer"></div>
+<div class="info-card">
+  <div class="row" style="justify-content:space-between; align-items:center;">
+    <strong>Chatbot</strong>
+    <div class="row" style="gap:8px">
+      <select id="modelSelect" class="pill" title="Choose a local model">
+        <option value="Llama-3.2-1B-Instruct-q4f32_1-MLC">Llama 3.2 1B (fastest)</option>
+
+      </select>
+      <button id="loadModelBtn" class="neural-button" style="padding:0 12px; min-height:36px;">
+        <div class="button-bg"></div>
+        <span class="button-text">Load model</span>
+        <div class="button-glow"></div>
+      </button>
+    </div>
+  </div>
+
+  <div id="initProgress" class="muted" style="margin-top:8px; font-size:12px;"></div>
+
+  <div id="chatLog" style="margin-top:12px; height:320px; overflow:auto; padding:12px; border:1px dashed rgba(255,255,255,.18); border-radius:12px; background:rgba(255,255,255,.02)"></div>
+
+  <div class="row" style="margin-top:12px; gap:8px;">
+    <textarea id="chatInput" rows="2" placeholder="Type your message…" style="flex:1; resize:vertical; border-radius:10px; padding:10px; background:rgba(255,255,255,.05); color:#fff; border:1px solid rgba(255,255,255,.12)"></textarea>
+    <button id="sendMsgBtn" class="neural-button" style="min-width:120px; min-height:42px;">
+      <div class="button-bg"></div>
+      <span class="button-text">Send</span>
+      <div class="button-glow"></div>
+    </button>
+  </div>
+</div>
+
+<!-- WebLLM runtime (must be in app page) -->
+<script type="module" src="https://esm.run/@mlc-ai/web-llm@0.2.48"></script>
+
       </div>
 
       <div class="footer-cta">
