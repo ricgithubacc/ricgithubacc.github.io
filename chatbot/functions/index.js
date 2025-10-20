@@ -1,86 +1,158 @@
 /* eslint-disable no-console */
+// Drop-in Cloud Functions v2 Express app with solid CORS + SSE keepalive
+// - Allows GitHub Pages origin (https://richardtran.website) and localhost
+// - Answers CORS preflight (OPTIONS) fast
+// - Streams responses with proper SSE headers and periodic keepalives
+// - Verifies Firebase ID token
+// - Calls Google AI Studio (OpenAI-compatible) chat completions (streaming)
 
 const {onRequest} = require('firebase-functions/v2/https');
 const {defineSecret} = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const express = require('express');
-const cors = require('cors');
 
-const LLM_KEY = defineSecret('LLM_KEY'); // <-- v2 secret handle
+// --- Secret for AI provider (configure in Firebase console > Build > Functions > Secrets) ---
+const LLM_KEY = defineSecret('LLM_KEY');
 
-admin.initializeApp();
+// --- Firebase Admin ---
+try {
+  admin.app();
+} catch (_) {
+  admin.initializeApp();
+}
 const db = admin.firestore();
 
+// --- Express app ---
 const app = express();
 
+// -----------------------------
+// CORS: allow specific origins
+// -----------------------------
+const ALLOW = new Set([
+  'https://richardtran.website', // GitHub Pages
+  'http://localhost:8000', // local dev (python -m http.server 8000)
+  'http://127.0.0.1:8000',
+]);
 
-// tighten this for prod: list your origins instead of "true"
-const allowedOrigins = true;
-const allowed = ['https://richardtran.website', 'http://localhost:8000'];
-app.use(cors({
-  origin: (origin, cb) => cb(null, !origin || allowed.includes(origin)),
-}));
+// Attach CORS headers to all responses
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin || ALLOW.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
+  // Always vary on Origin so caches don't mix responses
+  res.setHeader('Vary', 'Origin');
+  next();
+});
 
+// Answer CORS preflight quickly (before auth/body parsing)
+app.options('*', (req, res) => {
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, X-Requested-With',
+  );
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24h
+  res.status(204).end();
+});
 
-// ---- Provider config (Gemini OpenAI-compatible) ----
-const PROVIDER_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-const PROVIDER_MODEL = 'gemini-2.5-flash'; // choose the model you want
+// -----------------------------
+// Provider config (Google AI Studio, OpenAI-compatible endpoint)
+// -----------------------------
+const PROVIDER_URL =
+  'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+const PROVIDER_MODEL = 'gemini-2.5-flash'; // adjust if desired
 
-// ---- Auth middleware: verify Firebase ID token ----
+// -----------------------------
+// Auth: verify Firebase ID token from Authorization: Bearer <token>
+// -----------------------------
 async function verifyAuth(req, res, next) {
   const hdr = req.headers.authorization || '';
   const m = hdr.match(/^Bearer (.+)$/);
   if (!m) return res.status(401).send('Missing ID token');
   try {
     req.user = await admin.auth().verifyIdToken(m[1]);
-    next();
+    return next();
   } catch (e) {
-    res.status(401).send('Invalid ID token');
+    console.error('Auth error:', e);
+    return res.status(401).send('Invalid ID token');
   }
 }
 
-// ---- Chat endpoint (streams tokens) ----
-app.post('/chat', verifyAuth, async (req, res) => {
-  try {
-    // Parse JSON body
-    const body = await new Promise((ok) => {
-      let raw = '';
-      req.on('data', (c) => {
-        raw += c;
-      });
-      req.on('end', () => ok(raw ? JSON.parse(raw) : {}));
+// Helper: parse JSON body safely without body-parser (so we don't interfere with SSE)
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    let raw = '';
+    req.on('data', (c) => (raw += c));
+    req.on('end', () => {
+      if (!raw) return resolve({});
+      try {
+        resolve(JSON.parse(raw));
+      } catch (e) {
+        reject(e);
+      }
     });
+    req.on('error', reject);
+  });
+}
 
+// -----------------------------
+// Chat endpoint (SSE streaming)
+// -----------------------------
+app.post('/chat', verifyAuth, async (req, res) => {
+  // CORS headers on the actual POST response too
+  const origin = req.headers.origin;
+  if (!origin || ALLOW.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
+  res.setHeader('Vary', 'Origin');
+
+  // SSE headers
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+
+  // Keepalive ping so proxies don't time out long-running streams
+  const keepalive = setInterval(() => {
+    try {
+      res.write(':\n\n');
+    } catch (_) {}
+  }, 15000);
+
+  try {
+    const body = await readJson(req);
     const uid = req.user.uid;
-    const thread = body.thread || 'main';
+    const thread = String(body.thread || 'main');
     const userMsg = String(body.message || '').slice(0, 8000);
 
-    // Load prior history
-    const docRef = db.doc(`users/${uid}/chats/${thread}`);
-    const snap = await docRef.get();
-    const history = snap.exists ? (snap.data().history || []) : [];
-
-    // Build messages (server-authoritative system prompt)
-    const system = {role: 'system', content: 'You are a concise, helpful assistant.'};
-    const messages = [
-      system,
-      ...history.filter((m) => m.role !== 'system'),
-      {role: 'user', content: userMsg},
-    ];
-
-    // SSE headers
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Connection', 'keep-alive');
-
-    const apiKey = LLM_KEY.value();
-    if (!apiKey) {
-      res.write(`event: error\ndata: ${JSON.stringify({error: 'Missing LLM_KEY secret'})}\n\n`);
+    if (!userMsg) {
+      res.write(
+          `event: error\ndata: ${JSON.stringify({error: 'Empty message'})}\n\n`,
+      );
       return res.end();
     }
 
+    // Load short history for context
+    const docRef = db.doc(`users/${uid}/chats/${thread}`);
+    const snap = await docRef.get();
+    const history = snap.exists ? Array.isArray(snap.data().history) ? snap.data().history : [] : [];
 
-    // Call provider with streaming
+    const system = {role: 'system', content: 'You are a concise, helpful assistant.'};
+    const messages = [
+      system,
+      ...history.filter((m) => m && m.role !== 'system'),
+      {role: 'user', content: userMsg},
+    ];
+
+    const apiKey = LLM_KEY.value();
+    if (!apiKey) {
+      res.write(
+          `event: error\ndata: ${JSON.stringify({error: 'Missing LLM_KEY secret'})}\n\n`,
+      );
+      return res.end();
+    }
+
+    // Call provider (streaming)
     const upstream = await fetch(PROVIDER_URL, {
       method: 'POST',
       headers: {
@@ -97,8 +169,9 @@ app.post('/chat', verifyAuth, async (req, res) => {
     });
 
     if (!upstream.ok || !upstream.body) {
-      const text = await upstream.text();
-      res.write(`event: error\ndata: ${JSON.stringify({error: text})}\n\n`);
+      const text = await upstream.text().catch(() => `${upstream.status}`);
+      console.error('Upstream error:', upstream.status, text);
+      res.write(`event: error\ndata: ${JSON.stringify({error: text || 'Upstream error'})}\n\n`);
       return res.end();
     }
 
@@ -106,35 +179,29 @@ app.post('/chat', verifyAuth, async (req, res) => {
     const decoder = new TextDecoder();
     let assistant = '';
 
-    // --- Stream loop (no-constant-condition friendly) ---
-    let done = false;
-    while (!done) {
-      const read = await reader.read();
-      done = !!read.done;
+    // Stream frames to client and accumulate assistant text from OpenAI-style deltas
+    for (;;) {
+      const {value, done} = await reader.read();
       if (done) break;
+      const chunk = decoder.decode(value);
 
-      const chunk = decoder.decode(read.value);
-      // Forward raw chunk to client
+      // Forward raw stream (as data: ... lines)
       res.write(`data: ${chunk}\n\n`);
 
-      // Build assistant text by collecting delta tokens (OpenAI-style)
-      const lines = chunk.split('\n');
-      for (const line of lines) {
+      // Parse to collect assistant text
+      for (const line of chunk.split('\n')) {
         if (!line.startsWith('data: ')) continue;
         const payload = line.slice(6).trim();
-        if (payload === '[DONE]') continue;
+        if (!payload || payload === '[DONE]') continue;
         try {
           const obj = JSON.parse(payload);
           const delta = obj?.choices?.[0]?.delta?.content || '';
           if (delta) assistant += delta;
-        } catch (err) {
-          // Non-JSON frame (keep-alive / done / heartbeat) — skip
-          continue;
-        }
+        } catch (_) {/* ignore non-JSON frames */}
       }
     }
 
-    // Save history (trim to last N messages)
+    // Save conversation tail
     if (assistant.trim()) {
       const newHistory = [
         ...history,
@@ -147,19 +214,25 @@ app.post('/chat', verifyAuth, async (req, res) => {
     res.write('event: done\ndata: {}\n\n');
     res.end();
   } catch (e) {
-    res.write(`event: error\ndata: ${JSON.stringify({error: String(e)})}\n\n`);
+    console.error('Handler error:', e);
+    res.write(`event: error\ndata: ${JSON.stringify({error: String(e && e.message || e)})}\n\n`);
     res.end();
+  } finally {
+    clearInterval(keepalive);
   }
 });
 
+// -----------------------------
+// Export the HTTPS function
+// -----------------------------
 exports.api = onRequest(
     {
       region: 'us-central1',
-      timeoutSeconds: 60,
-      memory: '256MiB', // v2 uses MiB strings
+      timeoutSeconds: 120, // allow more time; we stream promptly to avoid GFE 504
+      memory: '512MiB',
       minInstances: 0,
-      maxInstances: 1, // cost guardrail
-      secrets: [LLM_KEY], // provide the secret to the function
+      maxInstances: 2,
+      secrets: [LLM_KEY],
     },
     app,
 );
