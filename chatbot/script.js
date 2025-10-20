@@ -198,13 +198,41 @@ if (page === "app") {
 }
 
 // ---------------- WebLLM Chat (app page, single-model) ----------------
+// ---------------- WebLLM Chat (app page, single-model, auto-resolve) ----------------
 import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.48";
 
-// Use the official prebuilt config so the model ID resolves
+// Use the official prebuilt config so WebLLM knows about its built-in models
 const appConfig = webllm.prebuiltAppConfig;
 
-// Hardcode to one model (keep this ID exactly)
-const MODEL_ID = "Llama-3.2-1B-Instruct-q4f32_1-MLC";
+/**
+ * Pick a supported model ID from appConfig.model_list.
+ * 1) Try exact match (the one you want).
+ * 2) Try partial match containing "llama-3.2-1b-instruct".
+ * 3) Fall back to the first model in the list.
+ */
+function resolveModelId(preferredExact, preferredHint) {
+  const list = (appConfig?.model_list ?? []);
+  if (!Array.isArray(list) || list.length === 0) {
+    throw new Error("WebLLM prebuilt appConfig contains no models.");
+  }
+  const exact = list.find(m => m?.model_id === preferredExact);
+  if (exact) return exact.model_id;
+
+  const hintLower = (preferredHint || "").toLowerCase();
+  const partial = list.find(m => String(m?.model_id).toLowerCase().includes(hintLower));
+  return (partial ?? list[0]).model_id;
+}
+
+// Ask WebLLM which ID exists in THIS build
+const MODEL_ID = resolveModelId(
+  "Llama-3.2-1B-Instruct-q4f32_1-MLC",   // your preferred exact ID
+  "llama-3.2-1b-instruct"               // fallback hint (case-insensitive partial)
+);
+
+// (Optional) Log what’s actually available so you can see it in DevTools
+console.log("[WebLLM] Available models:", (appConfig?.model_list ?? []).map(m => m.model_id));
+console.log("[WebLLM] Using model:", MODEL_ID);
+
 
 async function setupWebLLMChat() {
   const logEl = document.getElementById("chatLog");
