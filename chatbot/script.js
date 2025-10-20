@@ -54,9 +54,11 @@ function append(role, text) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 function setBusy(yes) {
-  $("#sendMsgBtn")?.classList.toggle("loading", yes);
-  if ($("#sendMsgBtn")) $("#sendMsgBtn").disabled = yes;
-  if ($("#chatInput")) $("#chatInput").disabled = yes;
+  const btn = $("#sendMsgBtn");
+  const input = $("#chatInput");
+  btn?.classList.toggle("loading", yes);
+  if (btn) btn.disabled = yes;
+  if (input) input.disabled = yes;
 }
 
 // ---------- Page-specific wiring ----------
@@ -79,7 +81,7 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
-// LOGIN handler (if you keep index.html login form)
+// LOGIN handler (index.html)
 if (page === "login") {
   const form = $("#loginForm");
   form?.addEventListener("submit", async (e) => {
@@ -97,7 +99,7 @@ if (page === "login") {
   });
 }
 
-// SIGNUP handler (if you keep signup.html form)
+// SIGNUP handler (signup.html)
 if (page === "signup") {
   const form = $("#signupForm");
   form?.addEventListener("submit", async (e) => {
@@ -124,7 +126,8 @@ if (page === "app") {
 }
 
 // ---------------- Remote Chat (Cloud Function) ----------------
-const ENDPOINT = "https://us-central1-webchatbot-df69c.cloudfunctions.net/api/chat";
+// Use same-origin route; Hosting rewrites /api/** -> function to avoid CORS
+const endpoint = "/api/chat";
 
 // Load + render history saved by the server: users/{uid}/chats/main
 async function loadAndRenderChatHistory() {
@@ -139,7 +142,9 @@ async function loadAndRenderChatHistory() {
   if (logEl) logEl.innerHTML = "";
 
   // (Keep a system prompt only in memory; don’t render it)
-  window._chatHistory = [{ role: "system", content: "You are a concise, helpful assistant. Keep answers short and on-topic." }];
+  window._chatHistory = [
+    { role: "system", content: "You are a concise, helpful assistant. Keep answers short and on-topic." }
+  ];
 
   if (snap.exists()) {
     const saved = snap.data()?.history;
@@ -155,126 +160,131 @@ async function loadAndRenderChatHistory() {
 }
 
 async function sendPrompt() {
-    const inputEl = document.getElementById("chatInput");
-    const logEl   = document.getElementById("chatLog");
-    const text = (inputEl?.value || "").trim();
-    if (!text) return;
-  
-    inputEl.value = "";
-    append("you", text);
-  
-    const user = auth.currentUser;
-    if (!user) { append("assistant", "Please sign in first."); return; }
-    let idToken;
-    try {
-      idToken = await user.getIdToken();
-    } catch (e) {
-      append("assistant", "Auth error. Please sign in again.");
+  const inputEl = document.getElementById("chatInput");
+  const logEl   = document.getElementById("chatLog");
+  const text = (inputEl?.value || "").trim();
+  if (!text) return;
+
+  inputEl.value = "";
+  append("you", text);
+
+  const user = auth.currentUser;
+  if (!user) { append("assistant", "Please sign in first."); return; }
+
+  let idToken;
+  try {
+    idToken = await user.getIdToken();
+  } catch {
+    append("assistant", "Auth error. Please sign in again.");
+    return;
+  }
+
+  setBusy(true);
+
+  // create streaming box
+  const box = document.createElement("div");
+  box.style.margin = "8px 0";
+  box.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div id="__streaming"></div>`;
+  logEl.appendChild(box);
+  const streamEl = box.querySelector("#__streaming");
+
+  const controller = new AbortController();
+  // allow more time (cold start + long generations)
+  const timeout = setTimeout(() => controller.abort("timeout"), 120_000);
+
+  let accumulated = "";
+
+  try {
+    const resp = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + idToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message: text, thread: "main" }),
+      signal: controller.signal
+    });
+
+    if (!resp.ok) {
+      const txt = await resp.text().catch(()=> "");
+      streamEl.textContent = `Server error (${resp.status}) ${txt || ""}`.trim();
       return;
     }
-  
-    setBusy(true);
-  
-    // create streaming box
-    const box = document.createElement("div");
-    box.style.margin = "8px 0";
-    box.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div id="__streaming"></div>`;
-    logEl.appendChild(box);
-    const streamEl = box.querySelector("#__streaming");
-  
-    const endpoint = "https://us-central1-webchatbot-df69c.cloudfunctions.net/api/chat";
-  
-    // abort after 45s so UI never hangs
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort("timeout"), 45_000);
-  
-    let accumulated = "";
-    try {
-      const resp = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Authorization": "Bearer " + idToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ message: text, thread: "main" }),
-        signal: controller.signal
-      });
-  
-      if (!resp.ok || !resp.body) {
-        const errText = `Server error (${resp.status})`;
-        streamEl.textContent = errText;
-        return;
-      }
-  
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-  
-      let done = false;
-      while (!done) {
-        const r = await reader.read();
-        done = !!r.done;
-        if (done) break;
-  
-        const chunk = decoder.decode(r.value);
-  
-        // Accept both:
-        //  - "data: {...}\n\n"
-        //  - "event: error\ndata: {...}\n\n"
-        let pendingEvent = "message";
-        for (const rawLine of chunk.split("\n")) {
-          const line = rawLine.trim();
-          if (!line) continue;
-  
-          if (line.startsWith("event:")) {
-            pendingEvent = line.slice(6).trim(); // e.g., "error" or "done"
-            continue;
-          }
-  
-          if (!line.startsWith("data:")) continue;
-          const payload = line.slice(5).trim();
-  
-          if (pendingEvent === "error") {
-            // Server forwarded an error as SSE event
-            try {
-              const { error } = JSON.parse(payload);
-              streamEl.textContent = "Error: " + (error || "Unknown error");
-            } catch {
-              streamEl.textContent = "Error (no details)";
-            }
-            continue;
-          }
-  
-          if (payload === "[DONE]") continue;
-  
-          // Normal OpenAI-style delta frame
-          try {
-            const obj = JSON.parse(payload);
-            const delta = obj?.choices?.[0]?.delta?.content || "";
-            if (delta) {
-              accumulated += delta;
-              streamEl.textContent = accumulated;
-              logEl.scrollTop = logEl.scrollHeight;
-            }
-          } catch {
-            // non-JSON keepalive; ignore
-          }
-        }
-      }
-  
-      // If nothing came through, show a friendly note
-      if (!accumulated && !streamEl.textContent) {
+
+    // If the server returned plain JSON (no streaming), render it
+    const ct = (resp.headers.get("content-type") || "").toLowerCase();
+    if (!resp.body || ct.includes("application/json")) {
+      try {
+        const j = await resp.json();
+        const t = j.output || j.text || j.message || JSON.stringify(j);
+        streamEl.textContent = t;
+      } catch {
         streamEl.textContent = "No response received.";
       }
-    } catch (e) {
-      streamEl.textContent = (e?.name === "AbortError")
-        ? "Timed out. Please try again."
-        : "Network error: " + String(e?.message || e);
-    } finally {
-      clearTimeout(timeout);
-      setBusy(false);
+      return;
     }
+
+    // SSE-style stream (OpenAI / event: data frames)
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+
+    for (;;) {
+      const r = await reader.read();
+      if (r.done) break;
+      const chunk = decoder.decode(r.value);
+
+      // Accept both "data: {...}\n\n" and "event: ...\ndata: {...}\n\n"
+      let pendingEvent = "message";
+      for (const rawLine of chunk.split("\n")) {
+        const line = rawLine.trim();
+        if (!line) continue;
+
+        if (line.startsWith("event:")) {
+          pendingEvent = line.slice(6).trim(); // e.g., "error" or "done"
+          continue;
+        }
+        if (!line.startsWith("data:")) continue;
+
+        const payload = line.slice(5).trim();
+
+        if (pendingEvent === "error") {
+          try {
+            const { error } = JSON.parse(payload);
+            streamEl.textContent = "Error: " + (error || "Unknown error");
+          } catch {
+            streamEl.textContent = "Error (no details)";
+          }
+          continue;
+        }
+
+        if (payload === "[DONE]") continue;
+
+        try {
+          const obj = JSON.parse(payload);
+          const delta = obj?.choices?.[0]?.delta?.content || "";
+          if (delta) {
+            accumulated += delta;
+            streamEl.textContent = accumulated;
+            logEl.scrollTop = logEl.scrollHeight;
+          }
+        } catch {
+          // Non-JSON keepalive; ignore
+        }
+      }
+    }
+
+    if (!accumulated && !streamEl.textContent) {
+      streamEl.textContent = "No response received.";
+    }
+  } catch (e) {
+    streamEl.textContent = (e?.name === "AbortError")
+      ? "Timed out. Please try again."
+      : "Network error: " + String(e?.message || e);
+  } finally {
+    clearTimeout(timeout);
+    setBusy(false);
   }
-  
+}
 
 // Wire up composer
 if (page === "app") {
