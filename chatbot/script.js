@@ -5,184 +5,131 @@ import {
   createUserWithEmailAndPassword, sendPasswordResetEmail, signOut
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
-// --- Fill this OR define window.firebaseConfig in a <script> before this file ---
+// Pull config from window (set in each HTML page). Fallback kept for dev.
 const firebaseConfig = window.firebaseConfig ?? {
   apiKey: "AIzaSyC2c5wDZDSjJT_08vUyb6P6i0Ry2bGHTZk",
-  authDomain: "webchatbot-df69c.firebaseapp.com",
-  projectId: "webchatbot-df69c",
-  storageBucket: "webchatbot-df69c.firebasestorage.app",
-  messagingSenderId: "400213955287",
-  appId: "1:400213955287:web:f8e3b8c1fc220a41ee5692",
-  measurementId: "G-EFPFJG4EWH"
+    authDomain: "webchatbot-df69c.firebaseapp.com",
+    projectId: "webchatbot-df69c",
+    storageBucket: "webchatbot-df69c.firebasestorage.app",
+    messagingSenderId: "400213955287",
+    appId: "1:400213955287:web:f8e3b8c1fc220a41ee5692",
+    measurementId: "G-EFPFJG4EWH"
 };
+
 // Initialize once
 if (!getApps().length) initializeApp(firebaseConfig);
 const auth = getAuth();
 
-// ---------- DOM helpers ----------
-const $  = (sel, root = document) => root.querySelector(sel);
-const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+// Small helper to print detailed errors under the field
+function showError(whereId, err) {
+  const el = document.getElementById(whereId);
+  if (!el) return;
+  // Common Firebase codes are very helpful to see
+  const code = err?.code || "unknown/error";
+  const msg  = err?.message || String(err);
+  el.textContent = `${code.replace("auth/", "")}: ${msg}`;
+}
+
+// ---------- Page tag ----------
 const page = document.body?.dataset?.page || "";
 
-// ---------- Floating labels + password eye (Login/Signup) ----------
-// ---------- Floating labels + password eye (Login/Signup) ----------
+// ---------- Float labels + password eye (unchanged, just robust) ----------
 document.addEventListener("DOMContentLoaded", () => {
-  // Keep labels floated when there’s text (incl. blur & autofill)
   document.querySelectorAll(".smart-field").forEach((wrap) => {
-    // Find the first input inside the field (handles .password-wrap)
     const input = wrap.querySelector("input");
     if (!input) return;
-
-    const sync = () => {
-      if (input.value && input.value.trim() !== "") wrap.classList.add("filled");
-      else wrap.classList.remove("filled");
-    };
-
-    // Events that reflect content / browser updates
-    input.addEventListener("input", sync);
-    input.addEventListener("change", sync);
-    input.addEventListener("blur", sync);
-
-    // Initialize (catch autofill)
-    setTimeout(sync, 0);
-    // A couple of extra checks right after load to catch late autofill
-    setTimeout(sync, 200);
-    setTimeout(sync, 800);
+    const sync = () => wrap.classList.toggle("filled", !!input.value?.trim());
+    ["input","change","blur"].forEach(evt => input.addEventListener(evt, sync));
+    setTimeout(sync, 0); setTimeout(sync, 250); setTimeout(sync, 1000);
   });
 
-  document.addEventListener('DOMContentLoaded', () => {
-  const isAuthPage =
-    document.getElementById('loginForm') ||
-    document.getElementById('signupForm');
-  if (isAuthPage) {
-    document.body.classList.add('auth-centered');
-  }
-});
-
-// ----- Sign In (index.html) submit handler -----
-document.addEventListener("DOMContentLoaded", () => {
-  const loginForm = document.getElementById("loginForm");
-  if (!loginForm) return;
-
-  loginForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = document.getElementById("email")?.value?.trim() || "";
-    const password = document.getElementById("password")?.value || "";
-    const emailErr = document.getElementById("email-error");
-    const pwdErr   = document.getElementById("password-error");
-
-    // Clear old errors
-    if (emailErr) emailErr.textContent = "";
-    if (pwdErr)   pwdErr.textContent   = "";
-
-    try {
-      await signInWithEmailAndPassword(getAuth(), email, password);
-      // onAuthStateChanged will redirect, but we can be explicit too:
-      location.replace("app.html");
-    } catch (err) {
-      console.error("Sign in failed:", err);
-      if (pwdErr) pwdErr.textContent = "Invalid email or password.";
-    }
-  });
-});
-
-
-  // Password eye toggle (works on both pages)
   const eye = document.getElementById("passwordToggle");
   const pwd = document.getElementById("password");
   if (eye && pwd) {
+    eye.type = "button";
     eye.addEventListener("click", (e) => {
-      e.preventDefault();          // never submit the form
-      e.stopPropagation();         // avoid bubbling weirdness
-      const showing = (pwd.type === "text");
-      pwd.type = showing ? "password" : "text";
-      eye.setAttribute("aria-pressed", String(!showing));
-      // Keep focus and caret position for nice UX
-      pwd.focus({ preventScroll: true });
-      const v = pwd.value; pwd.value = ""; pwd.value = v; // iOS caret fix
+      e.preventDefault();
+      const show = pwd.type !== "text";
+      pwd.type = show ? "text" : "password";
+      eye.setAttribute("aria-pressed", String(show));
+      try { pwd.focus({ preventScroll: true }); } catch {}
+      const v = pwd.value; pwd.value = ""; pwd.value = v;
     });
   }
 });
 
-
-// ---------- Auth guards + page wiring ----------
+// ---------- Auth guards ----------
 onAuthStateChanged(auth, (user) => {
   if (page === "app") {
-    if (!user) {
-      location.replace("index.html");
-      return;
-    }
-    // Fill account bits
-    const emailEl = $("#userEmail"); if (emailEl) emailEl.textContent = user.email || "(no email)";
-    const uidEl = $("#userUid");     if (uidEl)   uidEl.textContent   = user.uid || "";
+    if (!user) { location.replace("index.html"); return; }
+    const emailEl = document.getElementById("userEmail");
+    if (emailEl) emailEl.textContent = user.email || "(no email)";
   } else if (page === "login" || page === "signup") {
     if (user) location.replace("app.html");
   }
 });
 
-// ----- Sign In (index.html) -----
+// ---------- Sign In (index.html) ----------
 document.addEventListener("DOMContentLoaded", () => {
-  // Ensure blank placeholders so :placeholder-shown works
-  document.querySelectorAll('.smart-field input').forEach(inp => {
-    if (!inp.hasAttribute('placeholder')) inp.setAttribute('placeholder', ' ');
-    if (inp.placeholder === '') inp.placeholder = ' ';
-  });
+  const form = document.getElementById("loginForm");
+  if (!form) return;
 
-  // Float labels when there’s text (and on autofill)
-  document.querySelectorAll('.smart-field').forEach(wrap => {
-    const input = wrap.querySelector('input');
-    if (!input) return;
-    const sync = () => {
-      wrap.classList.toggle('filled', !!input.value && input.value.trim() !== '');
-    };
-    ['input','change','blur'].forEach(evt => input.addEventListener(evt, sync));
-    setTimeout(sync, 0);     // immediate
-    setTimeout(sync, 250);   // late autofill
-    setTimeout(sync, 1000);  // very late autofill
-  });
-
-  // Password eye
-  const eye = document.getElementById('passwordToggle');
-  const pwd = document.getElementById('password');
-  if (eye && pwd) {
-    eye.type = 'button'; // ensure it never submits
-    eye.addEventListener('click', (e) => {
-      e.preventDefault();
-      const show = pwd.type !== 'text';
-      pwd.type = show ? 'text' : 'password';
-      eye.setAttribute('aria-pressed', String(show));
-      // keep focus + caret visible
-      pwd.focus({ preventScroll: true });
-      const v = pwd.value; pwd.value = ''; pwd.value = v;
-    });
+  // Config sanity check so we fail loudly if placeholders are used
+  if (!firebaseConfig?.apiKey || firebaseConfig.apiKey.includes("YOUR_")) {
+    showError("password-error", new Error("Firebase config missing. Set window.firebaseConfig in HTML."));
+    return;
   }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("email")?.value?.trim() || "";
+    const pass  = document.getElementById("password")?.value || "";
+    document.getElementById("email-error")?.replaceChildren();
+    document.getElementById("password-error")?.replaceChildren();
+
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+      location.replace("app.html");
+    } catch (err) {
+      console.error("Sign in failed:", err);
+      showError("password-error", err);
+    }
+  });
 });
 
-
-// ----- Sign Up (signup.html) -----
+// ---------- Sign Up (signup.html) ----------
 document.addEventListener("DOMContentLoaded", () => {
-  const signupForm = $("#signupForm");
-  if (signupForm) {
-    signupForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = $("#email")?.value.trim();
-      const password = $("#password")?.value;
-      try {
-        await createUserWithEmailAndPassword(auth, email, password);
-        const ok = $("#successMessage");
-        if (ok) { ok.style.display = "block"; ok.textContent = "Account created! Redirecting…"; }
-        location.replace("app.html");
-      } catch (err) {
-        console.error(err);
-        ($("#email-error")||{}).textContent = "Could not create account. Try a different email.";
-      }
-    });
+  const form = document.getElementById("signupForm");
+  if (!form) return;
+
+  // Config sanity check here too
+  if (!firebaseConfig?.apiKey || firebaseConfig.apiKey.includes("YOUR_")) {
+    showError("password-error", new Error("Firebase config missing. Set window.firebaseConfig in HTML."));
+    return;
   }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("email")?.value?.trim() || "";
+    const pass  = document.getElementById("password")?.value || "";
+    document.getElementById("email-error")?.replaceChildren();
+    document.getElementById("password-error")?.replaceChildren();
+
+    try {
+      await createUserWithEmailAndPassword(auth, email, pass);
+      const ok = document.getElementById("successMessage");
+      if (ok) { ok.style.display = "block"; ok.textContent = "Account created! Redirecting…"; }
+      location.replace("app.html");
+    } catch (err) {
+      console.error("Sign up failed:", err);
+      showError("password-error", err); // shows e.g., weak-password, email-already-in-use
+    }
+  });
 });
 
-// ----- Sign Out (app.html) -----
+// ---------- Sign Out (app.html) ----------
 document.addEventListener("DOMContentLoaded", () => {
-  $("#signOutBtn")?.addEventListener("click", async (e) => {
+  document.getElementById("signOutBtn")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
     try {
@@ -195,6 +142,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
 
 // ===================== WebLLM: model load + chat =====================
 // The HTML expects: #loadModelBtn, #initProgress host, #chatInput, #sendMsgBtn, #chatLog
