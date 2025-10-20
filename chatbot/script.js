@@ -236,7 +236,7 @@ const MODEL_ID = "Phi-3-mini-4k-instruct-q4f16_1-MLC";
     if (!logEl || !inputEl || !sendBtn || !loadBtn) return; // not on app.html
   
     let engine = null;
-    const chatHistory = [{ role: "system", content: "You are a concise, helpful assistant." }];
+    const chatHistory = [{ role: "system", content: "You are a concise, helpful chinese assistant." }];
   
     // --- single progress bar helper (only here, once) ---
     function makeProgressBar() {
@@ -298,7 +298,8 @@ const MODEL_ID = "Phi-3-mini-4k-instruct-q4f16_1-MLC";
           initProgressCallback: (p) => {
             const pct = Math.round((p?.progress ?? 0) * 100);
             const phase = p?.text || "Loading";
-            bar?.set(pct, `${phase} — ${pct}%`);
+            bar?.set(pct, `Loading — ${pct}%`);
+
           }
         });
         bar?.done(`Model ready: ${MODEL_ID} (100%)`);
