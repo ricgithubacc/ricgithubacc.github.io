@@ -407,7 +407,7 @@ if (document.body.dataset.page === "app") {
       sendPrompt();
     }
   });
-}
+
 
 // Initialize the chat only on the app page (after your auth guard)
 if (document.body.dataset.page === "app") {
