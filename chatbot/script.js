@@ -1,12 +1,3 @@
-
-// ================================
-// script.js  (drop-in for /chatbot)
-// ================================
-
-
-
-
-// ----- PATH BASE: app lives under /chatbot -----
 // --- Base detection for local, GitHub Pages (project or user site), and other hosting ---
 const IS_LOCAL =
   location.protocol === "file:" ||
@@ -22,7 +13,7 @@ function detectBase() {
     const repo = parts.length ? `/${parts[0]}/` : "/";
     return repo;
   }
-  // fallback for other hosting
+  // fallback for other hosting (keeps your old assumption working)
   return "/chatbot/";
 }
 
@@ -30,8 +21,7 @@ const BASE = detectBase();
 
 function go(path) {
   if (IS_LOCAL) {
-    // relative navigation for local/file
-    window.location.href = path;
+    window.location.href = path; // relative navigation for local/file
   } else {
     window.location.href = (BASE + path).replace(/\/{2,}/g, "/");
   }
@@ -44,7 +34,7 @@ function here(file) {
   }
   const p = location.pathname;
   if (file === "index.html") {
-    // match root of BASE or explicit index.html
+    // match the root of BASE or explicit index path
     return p === BASE || p.endsWith(`${BASE}index.html`);
   }
   return p.endsWith(`${BASE}${file}`);
@@ -72,7 +62,7 @@ import {
 const firebaseConfig = {
     apiKey: "AIzaSyC2c5wDZDSjJT_08vUyb6P6i0Ry2bGHTZk",
     authDomain: "webchatbot-df69c.firebaseapp.com",
-    projectId: "ebchatbot-df69c",
+    projectId: "webchatbot-df69c",
     appId: "1:400213955287:web:f8e3b8c1fc220a41ee5692",
   };
 
