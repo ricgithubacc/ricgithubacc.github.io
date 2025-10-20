@@ -240,31 +240,27 @@ bar?.show("Idle");  // shows the empty bar immediately
 
 loadBtn.addEventListener("click", async () => {
     if (engine) {
-      progEl.textContent = `Model already loaded: ${MODEL_ID} (100%)`;
+      bar?.done("Model already loaded");
       return;
     }
-  
-    // show baseline
-    progEl.textContent = "Downloading model… 0%";
+    bar?.show("Downloading model… 0%");
   
     try {
       engine = await webllm.CreateMLCEngine(MODEL_ID, {
         appConfig,
         initProgressCallback: (p) => {
-          // p.progress is 0..1, p.text is a short phase label
-          const pct = Math.max(0, Math.min(100, Math.round((p?.progress ?? 0) * 100)));
-          const phase = p?.text || "Loading";
-          progEl.textContent = `${phase} — ${pct}%`;
+          const pct = Math.round((p.progress || 0) * 100);
+          bar?.set(pct, `${p.text} — ${pct}%`);
         }
       });
-      progEl.textContent = `Model ready: ${MODEL_ID} (100%)`;
+      bar?.done(`Model ready: ${MODEL_ID}`);
       inputEl.focus();
     } catch (e) {
-      progEl.textContent = "Model load failed: " + (e?.message || e);
+      const host = document.getElementById("initProgress");
+      if (host) host.textContent = "Model load failed: " + (e?.message || e);
       engine = null;
     }
   });
-  
 
 
   if (!logEl || !inputEl || !sendBtn || !loadBtn) return; // not on app.html
