@@ -226,10 +226,6 @@ function resolveModelId(preferredExact, preferredHint) {
 // Ask WebLLM which ID exists in THIS build
 const MODEL_ID = "Phi-3-mini-4k-instruct-q4f16_1-MLC";
 
-// (Optional) Log what’s actually available so you can see it in DevTools
-console.log("[WebLLM] Available models:", (appConfig?.model_list ?? []).map(m => m.model_id));
-console.log("[WebLLM] Using model:", MODEL_ID);
-
 
 async function setupWebLLMChat() {
   const logEl = document.getElementById("chatLog");
@@ -243,28 +239,32 @@ const bar = makeProgressBar();
 bar?.show("Idle");  // shows the empty bar immediately
 
 loadBtn.addEventListener("click", async () => {
-  if (engine) {
-    bar?.done("Model already loaded");
-    return;
-  }
-  bar?.show("Downloading model… 0%");
-
-  try {
-    engine = await webllm.CreateMLCEngine(MODEL_ID, {
-      appConfig,
-      initProgressCallback: (p) => {
-        const pct = Math.round((p.progress || 0) * 100);
-        bar?.set(pct, `${p.text} — ${pct}%`);
-      }
-    });
-    bar?.done(`Model ready: ${MODEL_ID}`);
-    inputEl.focus();
-  } catch (e) {
-    const host = document.getElementById("initProgress");
-    if (host) host.textContent = "Model load failed: " + (e?.message || e);
-    engine = null;
-  }
-});
+    if (engine) {
+      progEl.textContent = `Model already loaded: ${MODEL_ID} (100%)`;
+      return;
+    }
+  
+    // show baseline
+    progEl.textContent = "Downloading model… 0%";
+  
+    try {
+      engine = await webllm.CreateMLCEngine(MODEL_ID, {
+        appConfig,
+        initProgressCallback: (p) => {
+          // p.progress is 0..1, p.text is a short phase label
+          const pct = Math.max(0, Math.min(100, Math.round((p?.progress ?? 0) * 100)));
+          const phase = p?.text || "Loading";
+          progEl.textContent = `${phase} — ${pct}%`;
+        }
+      });
+      progEl.textContent = `Model ready: ${MODEL_ID} (100%)`;
+      inputEl.focus();
+    } catch (e) {
+      progEl.textContent = "Model load failed: " + (e?.message || e);
+      engine = null;
+    }
+  });
+  
 
 
   if (!logEl || !inputEl || !sendBtn || !loadBtn) return; // not on app.html
