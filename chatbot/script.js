@@ -238,6 +238,35 @@ async function setupWebLLMChat() {
   const loadBtn = document.getElementById("loadModelBtn");
   const progEl = document.getElementById("initProgress");
 
+// at the top of setupWebLLMChat(), after you grab DOM elems:
+const bar = makeProgressBar();
+bar?.show("Idle");  // shows the empty bar immediately
+
+loadBtn.addEventListener("click", async () => {
+  if (engine) {
+    bar?.done("Model already loaded");
+    return;
+  }
+  bar?.show("Downloading model… 0%");
+
+  try {
+    engine = await webllm.CreateMLCEngine(MODEL_ID, {
+      appConfig,
+      initProgressCallback: (p) => {
+        const pct = Math.round((p.progress || 0) * 100);
+        bar?.set(pct, `${p.text} — ${pct}%`);
+      }
+    });
+    bar?.done(`Model ready: ${MODEL_ID}`);
+    inputEl.focus();
+  } catch (e) {
+    const host = document.getElementById("initProgress");
+    if (host) host.textContent = "Model load failed: " + (e?.message || e);
+    engine = null;
+  }
+});
+
+
   if (!logEl || !inputEl || !sendBtn || !loadBtn) return; // not on app.html
 
   let engine = null;
@@ -259,18 +288,18 @@ async function setupWebLLMChat() {
   }
 
 // Build (once) and control a progress bar inside #initProgress
+// Build (once) and control a progress bar inside #initProgress
 function makeProgressBar() {
     const host = document.getElementById("initProgress");
     if (!host) return null;
   
-    // If already built, reuse it
     let root = host.querySelector(".webllm-progress");
     if (!root) {
       host.textContent = ""; // clear any old text
       root = document.createElement("div");
       root.className = "webllm-progress";
       root.innerHTML = `
-        <div class="label" id="wlmLabel">Preparing…</div>
+        <div class="label" id="wlmLabel">Ready</div>
         <div class="track"><div class="fill" id="wlmFill"></div></div>
       `;
       host.appendChild(root);
@@ -287,19 +316,16 @@ function makeProgressBar() {
       done(finalText = "Model ready") {
         if (fill)  fill.style.width = "100%";
         if (label) label.textContent = finalText;
-        // Optional: fade out after a moment
-        setTimeout(() => {
-          root.style.opacity = "0.0";
-          root.style.transition = "opacity .35s ease";
-        }, 800);
+        // (no fade; keep visible so you can see it worked)
       },
       show(text = "Starting… 0%") {
-        root.style.opacity = "1";
         if (label) label.textContent = text;
         if (fill)  fill.style.width = "0%";
+        root.style.opacity = "1";
       }
     };
   }
+  
   
 
   loadBtn.addEventListener("click", async () => {

@@ -967,3 +967,8 @@ html, body {
     box-shadow: 0 0 12px rgba(147,197,253,.35);
   }
   
+  /* keep the progress area visible even at 0% */
+#initProgress { min-height: 32px; }
+
+/* ensure the bar isn't collapsed by parent styles */
+.webllm-progress { display: block; }
