@@ -972,3 +972,26 @@ html, body {
 
 /* ensure the bar isn't collapsed by parent styles */
 .webllm-progress { display: block; }
+
+/* WebLLM progress (single bar) */
+.webllm-progress .track {
+    position: relative;
+    height: 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    border: 0;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
+    overflow: hidden;
+  }
+  .webllm-progress .fill {
+    height: 100%;
+    border-radius: 999px;
+    background:
+      linear-gradient(to bottom, rgba(255,255,255,0.75), rgba(255,255,255,0.35)),
+      linear-gradient(to right, rgba(120,180,255,0.45), rgba(160,120,255,0.45));
+    box-shadow: inset 0 0 12px rgba(255,255,255,.35);
+    transition: width .25s ease;
+  }
+  

@@ -33,6 +33,7 @@
           </div>
         </div>
         <h1 class="muted" style="margin:0; letter-spacing:.2px;">Your Chatbot</h1>
+        <!-- (Removed the "Signed in" badge) -->
       </div>
 
       <nav class="row" style="margin-left:auto; gap:10px;">
@@ -54,18 +55,18 @@
       </div>
     </section>
 
-    <!-- Two-column layout -->
+    <!-- Main two-column layout -->
     <div class="grid two section-grid">
       <!-- Account -->
       <section class="info-card glass-card">
         <strong id="accountTitle">Account</strong>
         <div class="muted" style="margin-top:10px;">Email: <span id="userEmail">(loading…)</span></div>
-        <!-- Keep UID element hidden so JS won’t break -->
+        <!-- Keep UID node for safety but hidden -->
         <div style="display:none;">UID: <span id="userUid"></span></div>
 
         <div class="spacer" style="height:12px;"></div>
 
-        <!-- Load AI + Progress bar grouped -->
+        <!-- Load AI + single progress host (script.js renders the bar + "Model:" here) -->
         <div class="row" style="gap:12px; align-items:center; flex-wrap:wrap;">
           <button id="loadModelBtn" class="neural-button" style="min-height:42px;" title="Download and initialize the on-device model">
             <div class="button-bg"></div>
@@ -74,22 +75,9 @@
           </button>
 
           <div class="progress-wrap" style="min-width:260px; flex:1; max-width:600px;">
-            <!-- Progress first -->
-            <div class="progress" role="progressbar" aria-label="Model download progress"
-                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-describedby="initProgress">
-              <div id="modelProgressFill" class="progress-fill" style="width:0%"></div>
-            </div>
-            <!-- Label underneath -->
-            <div id="initProgress" class="progress-label muted" aria-live="polite"
-                 style="font-size:12px; margin:6px 0 0;">
-              Model: not loaded
-            </div>
+            <div id="initProgress"></div>
           </div>
         </div>
-
-        <p class="muted" style="font-size:12px; line-height:1.4; margin:12px 0 0;">
-          Tip: After loading, press <kbd>Enter</kbd> to send, or <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line.
-        </p>
       </section>
 
       <!-- Chat -->
@@ -98,12 +86,12 @@
           <strong id="chatTitle">Chatbot</strong>
         </div>
 
-        <!-- Chat history -->
+        <!-- History -->
         <div id="chatLog" aria-live="polite" aria-label="Chat history"
              style="margin-top:12px; height:clamp(260px, 40vh, 420px); overflow:auto; padding:12px; border-radius:16px; background:rgba(255,255,255,.03); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);">
         </div>
 
-        <!-- Composer (textarea full width ABOVE send button) -->
+        <!-- Composer: textarea full width ABOVE send -->
         <div class="stack" style="margin-top:12px; gap:10px;">
           <label for="chatInput" class="visually-hidden">Message</label>
           <textarea id="chatInput" rows="3" placeholder="Type your message…"
@@ -128,50 +116,10 @@
     </footer>
   </div>
 
-  <!-- Progress helpers -->
-  <script>
-    // Public helper: update progress 0..100, or null for indeterminate
-    window.updateModelProgress = function(pct, label) {
-      const bar = document.getElementById('modelProgressFill');
-      const wrap = bar?.parentElement;
-      const txt = document.getElementById('initProgress');
-      if (!bar || !wrap) return;
-
-      if (pct == null) {
-        wrap.classList.add('indeterminate');
-        wrap.setAttribute('aria-valuenow', '0');
-        bar.style.width = '40%';
-      } else {
-        wrap.classList.remove('indeterminate');
-        const clamped = Math.max(0, Math.min(100, pct|0));
-        wrap.setAttribute('aria-valuenow', String(clamped));
-        bar.style.width = clamped + '%';
-      }
-      if (txt && label) txt.textContent = label;
-    };
-
-    // Mirror any "NN%" text written into #initProgress
-    (function mirrorTextPercent() {
-      const txt = document.getElementById('initProgress');
-      const m = new MutationObserver(() => {
-        const t = txt.textContent || '';
-        const m2 = t.match(/(\d{1,3})\s*%/);
-        if (m2) window.updateModelProgress(parseInt(m2[1],10));
-      });
-      txt && m.observe(txt, { childList:true, subtree:true, characterData:true });
-    })();
-
-    // Immediate visual feedback on click
-    document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('loadModelBtn')?.addEventListener('click', () => {
-        window.updateModelProgress(null, 'Preparing model…');
-      }, { capture: true });
-    });
-  </script>
-
+  <!-- Your app script -->
   <script type="module" src="script.js"></script>
 
-  <!-- Local overrides -->
+  <!-- Local overrides (glass + spacing + scroll + big sign out) -->
   <style>
     /* Ensure the page always scrolls at 100% zoom */
     html, body { height: auto !important; min-height: 100%; overflow-y: auto !important; }
@@ -182,7 +130,7 @@
     .section-block { margin-top: 16px; margin-bottom: 22px; }
     .section-grid { gap: 28px !important; margin-top: 8px; margin-bottom: 12px; }
 
-    /* Glass cards */
+    /* Glass cards (rounded, no boxy borders) */
     .glass-card {
       border: 0 !important;
       border-radius: 22px !important;
@@ -196,11 +144,11 @@
     }
 
     /* BIGGER Sign out button */
-    .signout-big { 
-      min-width: 160px; 
-      min-height: 50px; 
-      padding: 10px 18px; 
-      font-size: 16px; 
+    .signout-big {
+      min-width: 160px;
+      min-height: 50px;
+      padding: 10px 18px;
+      font-size: 16px;
       font-weight: 600;
       border-radius: 16px !important;
     }
@@ -232,40 +180,6 @@
         inset 0 0 0 1px rgba(255,255,255,.12);
     }
     .neural-button .button-glow { opacity: .35; }
-
-    /* Progress bar */
-    .progress {
-      position: relative;
-      height: 12px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.08);
-      border: 0;
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      border-radius: 999px;
-      background:
-        linear-gradient( to bottom, rgba(255,255,255,0.75), rgba(255,255,255,0.35) ),
-        linear-gradient( to right, rgba(120,180,255,0.45), rgba(160,120,255,0.45) );
-      box-shadow: inset 0 0 12px rgba(255,255,255,.35);
-      transition: width .25s ease;
-    }
-    .progress.indeterminate .progress-fill {
-      position: relative;
-      width: 40%;
-      animation: indet 1.2s linear infinite;
-      background:
-        repeating-linear-gradient( 45deg, rgba(255,255,255,0.35) 0 10px, rgba(255,255,255,0.15) 10px 20px ),
-        linear-gradient( to right, rgba(120,180,255,0.35), rgba(160,120,255,0.35) );
-    }
-    @keyframes indet {
-      0% { transform: translateX(-60%); }
-      100% { transform: translateX(160%); }
-    }
 
     /* Responsive tweaks */
     @media (max-width: 880px) {

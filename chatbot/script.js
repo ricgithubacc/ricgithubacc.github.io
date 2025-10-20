@@ -312,35 +312,49 @@ if (user) {
 
     // --- single progress bar helper (only here, once) ---
     function makeProgressBar() {
-      const host = document.getElementById("initProgress");
-      if (!host) return null;
-      let root = host.querySelector(".webllm-progress");
-      if (!root) {
-        host.innerHTML = `
-          <div class="webllm-progress">
-            <div class="label" id="wlmLabel">Idle</div>
-            <div class="track"><div class="fill" id="wlmFill" style="width:0%"></div></div>
-          </div>`;
+        const host = document.getElementById("initProgress");
+        if (!host) return null;
+      
+        // If already created, re-use (prevents duplicates)
+        let root = host.querySelector(".webllm-progress");
+        if (!root) {
+          host.innerHTML = `
+            <div class="webllm-progress">
+              <div class="track" role="progressbar" aria-label="Model download progress"
+                   aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div class="fill" id="wlmFill" style="width:0%"></div>
+              </div>
+              <div class="label muted" id="wlmLabel" aria-live="polite" style="margin-top:6px; font-size:12px;">
+                Model: 0%
+              </div>
+            </div>`;
+        }
+      
+        const label = host.querySelector("#wlmLabel");
+        const fill  = host.querySelector("#wlmFill");
+        const track = host.querySelector(".track");
+      
+        return {
+          show(text = "Model: 0%") {
+            if (label) label.textContent = text;
+            if (fill)  fill.style.width = "0%";
+            if (track) track.setAttribute("aria-valuenow", "0");
+          },
+          set(pct, text) {
+            const p = Math.max(0, Math.min(100, pct|0));
+            if (fill)  fill.style.width = p + "%";
+            if (label) label.textContent = text ?? `Model: ${p}%`;
+            if (track) track.setAttribute("aria-valuenow", String(p));
+          },
+          done(text = "Model: 100% Ready") {
+            if (fill)  fill.style.width = "100%";
+            if (label) label.textContent = text;
+            if (track) track.setAttribute("aria-valuenow", "100");
+          },
+          error(text) { if (label) label.textContent = text; }
+        };
       }
-      const label = host.querySelector("#wlmLabel");
-      const fill  = host.querySelector("#wlmFill");
-      return {
-        show(text = "Starting… 0%") {
-          if (label) label.textContent = text;
-          if (fill)  fill.style.width = "0%";
-        },
-        set(pct, text) {
-          const p = Math.max(0, Math.min(100, pct|0));
-          if (fill)  fill.style.width = p + "%";
-          if (label) label.textContent = text ?? `Loading… ${p}%`;
-        },
-        done(text = "Model ready (100%)") {
-          if (fill)  fill.style.width = "100%";
-          if (label) label.textContent = text;
-        },
-        error(text) { if (label) label.textContent = text; }
-      };
-    }
+      
   
     const bar = makeProgressBar();
     bar?.show("Idle");
