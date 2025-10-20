@@ -224,10 +224,7 @@ function resolveModelId(preferredExact, preferredHint) {
 }
 
 // Ask WebLLM which ID exists in THIS build
-const MODEL_ID = resolveModelId(
-  "Llama-3.2-1B-Instruct-q4f32_1-MLC",   // your preferred exact ID
-  "llama-3.2-1b-instruct"               // fallback hint (case-insensitive partial)
-);
+const MODEL_ID = "Llama-3.2-1B-Instruct-q4f32_1-MLC"
 
 // (Optional) Log what’s actually available so you can see it in DevTools
 console.log("[WebLLM] Available models:", (appConfig?.model_list ?? []).map(m => m.model_id));
