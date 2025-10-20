@@ -258,24 +258,74 @@ async function setupWebLLMChat() {
     sendBtn.classList.toggle("loading", yes);
   }
 
+// Build (once) and control a progress bar inside #initProgress
+function makeProgressBar() {
+    const host = document.getElementById("initProgress");
+    if (!host) return null;
+  
+    // If already built, reuse it
+    let root = host.querySelector(".webllm-progress");
+    if (!root) {
+      host.textContent = ""; // clear any old text
+      root = document.createElement("div");
+      root.className = "webllm-progress";
+      root.innerHTML = `
+        <div class="label" id="wlmLabel">Preparing…</div>
+        <div class="track"><div class="fill" id="wlmFill"></div></div>
+      `;
+      host.appendChild(root);
+    }
+    const label = root.querySelector("#wlmLabel");
+    const fill  = root.querySelector("#wlmFill");
+  
+    return {
+      set(pct, text) {
+        const clamped = Math.max(0, Math.min(100, pct|0));
+        if (fill)  fill.style.width = clamped + "%";
+        if (label) label.textContent = text ?? `Loading… ${clamped}%`;
+      },
+      done(finalText = "Model ready") {
+        if (fill)  fill.style.width = "100%";
+        if (label) label.textContent = finalText;
+        // Optional: fade out after a moment
+        setTimeout(() => {
+          root.style.opacity = "0.0";
+          root.style.transition = "opacity .35s ease";
+        }, 800);
+      },
+      show(text = "Starting… 0%") {
+        root.style.opacity = "1";
+        if (label) label.textContent = text;
+        if (fill)  fill.style.width = "0%";
+      }
+    };
+  }
+  
+
   loadBtn.addEventListener("click", async () => {
     if (engine) return;
-    progEl.textContent = "Downloading model… (first time can take a bit)";
+  
+    const bar = makeProgressBar();
+    bar?.show("Downloading model… 0%");
+  
     try {
       engine = await webllm.CreateMLCEngine(MODEL_ID, {
-        appConfig, // <-- makes sure MODEL_ID is found
+        appConfig,
         initProgressCallback: (p) => {
-          const pct = (p.progress * 100).toFixed(0);
-          progEl.textContent = `${p.text} — ${pct}%`;
+          // p.progress is 0..1, p.text is a short phase label
+          const pct = Math.round((p.progress || 0) * 100);
+          bar?.set(pct, `${p.text} — ${pct}%`);
         }
       });
-      progEl.textContent = `Model ready`;
+      bar?.done(`Model ready: ${MODEL_ID}`);
       inputEl.focus();
     } catch (e) {
-      progEl.textContent = "Model load failed: " + (e?.message || e);
+      const host = document.getElementById("initProgress");
+      if (host) host.textContent = "Model load failed: " + (e?.message || e);
       engine = null;
     }
   });
+  
 
   async function sendPrompt() {
     if (!engine) { progEl.textContent = "Load the model first."; return; }
