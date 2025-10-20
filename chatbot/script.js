@@ -56,6 +56,33 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+// ----- Sign In (index.html) submit handler -----
+document.addEventListener("DOMContentLoaded", () => {
+  const loginForm = document.getElementById("loginForm");
+  if (!loginForm) return;
+
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("email")?.value?.trim() || "";
+    const password = document.getElementById("password")?.value || "";
+    const emailErr = document.getElementById("email-error");
+    const pwdErr   = document.getElementById("password-error");
+
+    // Clear old errors
+    if (emailErr) emailErr.textContent = "";
+    if (pwdErr)   pwdErr.textContent   = "";
+
+    try {
+      await signInWithEmailAndPassword(getAuth(), email, password);
+      // onAuthStateChanged will redirect, but we can be explicit too:
+      location.replace("app.html");
+    } catch (err) {
+      console.error("Sign in failed:", err);
+      if (pwdErr) pwdErr.textContent = "Invalid email or password.";
+    }
+  });
+});
+
 
   // Password eye toggle (works on both pages)
   const eye = document.getElementById("passwordToggle");
