@@ -11,6 +11,16 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+// Firestore (lite) – tiny bundle, perfect for saving small docs
+import {
+    getFirestore,
+    doc,
+    getDoc,
+    setDoc
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
+
+  
+
 // 1) FILL THESE FROM Firebase Console → Project settings → Web app
 const firebaseConfig = {
   apiKey: "AIzaSyC2c5wDZDSjJT_08vUyb6P6i0Ry2bGHTZk",
@@ -20,8 +30,12 @@ const firebaseConfig = {
 };
 
 // 2) Init + keep session across reloads
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);   // <-- MOVE here (after app)
+await setPersistence(auth, browserLocalPersistence);
+
 await setPersistence(auth, browserLocalPersistence);
 
 // Custom domain + app under /chatbot
@@ -223,6 +237,37 @@ function resolveModelId(preferredExact, preferredHint) {
   return (partial ?? list[0]).model_id;
 }
 
+// --- Chat persistence helpers (per authenticated user) ---
+const CHAT_COLLECTION = "chats";
+const CHAT_DOC = "main";   // single ongoing thread per user (rename if you want multiple)
+
+async function loadChatHistory(uid) {
+  try {
+    const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data();
+      return Array.isArray(data?.history) ? data.history : [];
+    }
+  } catch (e) {
+    console.warn("[chat] load error:", e);
+  }
+  return [];
+}
+
+async function saveChatHistory(uid, history) {
+  // Store up to N most recent messages to keep the doc small
+  const MAX_MSGS = 200;
+  const trimmed = history.slice(-MAX_MSGS);
+  try {
+    const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
+    await setDoc(ref, { history: trimmed }, { merge: true });
+  } catch (e) {
+    console.warn("[chat] save error:", e);
+  }
+}
+
+
 // Ask WebLLM which ID exists in THIS build
 const MODEL_ID = "Phi-3-mini-4k-instruct-q4f16_1-MLC";
 
@@ -238,6 +283,33 @@ const MODEL_ID = "Phi-3-mini-4k-instruct-q4f16_1-MLC";
     let engine = null;
     const chatHistory = [{ role: "system", content: "You are a concise, helpful assistant with a very thick chinese accent and you type like you have a chinese accent" }];
   
+    // Load existing messages for this signed-in user (if any) and render them
+const user = auth.currentUser;
+if (user) {
+  const saved = await loadChatHistory(user.uid);
+  // Prepend our system prompt (keep it at index 0); append saved turns after it
+  // If saved already included a system message, we’ll keep *our* current one and then the saved turns
+  for (const m of saved) {
+    if (m.role !== "system") chatHistory.push(m);
+  }
+  // Render into the UI so the user sees the prior convo
+  for (const m of chatHistory) {
+    if (m.role === "user") {
+      const wrap = document.createElement("div");
+      wrap.style.margin = "8px 0";
+      wrap.innerHTML = `<div class="muted" style="font-size:12px">you</div><div>${m.content.replace(/</g,"&lt;")}</div>`;
+      logEl.appendChild(wrap);
+    } else if (m.role === "assistant") {
+      const wrap = document.createElement("div");
+      wrap.style.margin = "8px 0";
+      wrap.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div>${m.content.replace(/</g,"&lt;")}</div>`;
+      logEl.appendChild(wrap);
+    }
+  }
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+
     // --- single progress bar helper (only here, once) ---
     function makeProgressBar() {
       const host = document.getElementById("initProgress");
@@ -317,6 +389,9 @@ const MODEL_ID = "Phi-3-mini-4k-instruct-q4f16_1-MLC";
       inputEl.value = "";
       append("you", user);
       chatHistory.push({ role: "user", content: user });
+      if (auth.currentUser) {
+        saveChatHistory(auth.currentUser.uid, chatHistory);
+      }
   
       setBusy(true);
       let assistantText = "";
@@ -352,6 +427,10 @@ const MODEL_ID = "Phi-3-mini-4k-instruct-q4f16_1-MLC";
         }
       } finally {
         if (assistantText) chatHistory.push({ role: "assistant", content: assistantText });
+        if (assistantText && auth.currentUser) {
+            saveChatHistory(auth.currentUser.uid, chatHistory);
+          }
+          
         setBusy(false);
       }
     }
