@@ -36,8 +36,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);   // <-- MOVE here (after app)
 await setPersistence(auth, browserLocalPersistence);
 
-await setPersistence(auth, browserLocalPersistence);
-
 // Custom domain + app under /chatbot
 const REPO = "";            // not used for custom domain
 // ----- App lives under /chatbot -----
@@ -212,253 +210,212 @@ if (page === "app") {
 }
 
 // ---------------- WebLLM Chat (app page, single-model) ----------------
-// ---------------- WebLLM Chat (app page, single-model, auto-resolve) ----------------
+// ---------------- WebLLM Chat with model selector ----------------
 import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.48";
-
-// Use the official prebuilt config so WebLLM knows about its built-in models
 const appConfig = webllm.prebuiltAppConfig;
 
-/**
- * Pick a supported model ID from appConfig.model_list.
- * 1) Try exact match (the one you want).
- * 2) Try partial match containing "llama-3.2-1b-instruct".
- * 3) Fall back to the first model in the list.
- */
+// Friendly presets. We resolve each to an actual model_id available in this build.
+const MODEL_PRESETS = [
+  {
+    key: "phi3-mini",
+    label: "Phi-3 Mini (4K) – balanced",
+    exact: "Phi-3-mini-4k-instruct-q4f16_1-MLC",
+    hint:  "phi-3-mini-4k"
+  },
+  {
+    key: "llama-1b",
+    label: "Llama 3.2 1B – very light",
+    exact: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
+    hint:  "llama-3.2-1b"
+  },
+  {
+    key: "qwen-0.5b",
+    label: "Qwen2.5 0.5B – ultra light",
+    exact: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
+    hint:  "qwen2.5-0.5b"
+  }
+];
+
+/** Return a valid model_id from appConfig.model_list given desired exact/hint. */
 function resolveModelId(preferredExact, preferredHint) {
-  const list = (appConfig?.model_list ?? []);
+  const list = appConfig?.model_list ?? [];
   if (!Array.isArray(list) || list.length === 0) {
     throw new Error("WebLLM prebuilt appConfig contains no models.");
   }
   const exact = list.find(m => m?.model_id === preferredExact);
   if (exact) return exact.model_id;
-
-  const hintLower = (preferredHint || "").toLowerCase();
-  const partial = list.find(m => String(m?.model_id).toLowerCase().includes(hintLower));
+  const hint = (preferredHint || "").toLowerCase();
+  const partial = list.find(m => String(m?.model_id).toLowerCase().includes(hint));
   return (partial ?? list[0]).model_id;
 }
 
-// --- Chat persistence helpers (per authenticated user) ---
-const CHAT_COLLECTION = "chats";
-const CHAT_DOC = "main";   // single ongoing thread per user (rename if you want multiple)
+// Build a resolved catalog once (maps preset.key -> {label, model_id})
+const RESOLVED = MODEL_PRESETS.map(p => ({
+  key: p.key,
+  label: p.label,
+  model_id: resolveModelId(p.exact, p.hint)
+}));
 
-async function loadChatHistory(uid) {
-  try {
-    const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      const data = snap.data();
-      return Array.isArray(data?.history) ? data.history : [];
+function getSavedModelKey() {
+  return localStorage.getItem("wlm:modelKey") || "phi3-mini";
+}
+function saveModelKey(key) {
+  localStorage.setItem("wlm:modelKey", key);
+}
+function getModelByKey(key) {
+  return RESOLVED.find(x => x.key === key) || RESOLVED[0];
+}
+
+function populateModelSelect(selectEl) {
+  if (!selectEl) return;
+  selectEl.innerHTML = "";
+  for (const m of RESOLVED) {
+    const opt = document.createElement("option");
+    opt.value = m.key;
+    opt.textContent = m.label;
+    selectEl.appendChild(opt);
+  }
+  selectEl.value = getSavedModelKey();
+}
+
+// --- Single progress bar helper (unchanged API; now also updates the label) ---
+function makeProgressBar() {
+  const host = document.getElementById("initProgress");
+  const activeLabel = document.getElementById("activeModelLabel");
+  if (!host) return null;
+
+  let root = host.querySelector(".webllm-progress");
+  if (!root) {
+    host.innerHTML = `
+      <div class="webllm-progress">
+        <div class="track" role="progressbar" aria-label="Model download progress"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="fill" id="wlmFill" style="width:0%"></div>
+        </div>
+        <div class="label muted" id="wlmLabel" aria-live="polite" style="margin-top:6px; font-size:12px;">
+          Model: 0%
+        </div>
+      </div>`;
+  }
+  const label = host.querySelector("#wlmLabel");
+  const fill  = host.querySelector("#wlmFill");
+  const track = host.querySelector(".track");
+
+  return {
+    show(text = "Model: 0%") {
+      if (label) label.textContent = text;
+      if (fill)  fill.style.width = "0%";
+      if (track) track.setAttribute("aria-valuenow", "0");
+    },
+    set(pct, text) {
+      const p = Math.max(0, Math.min(100, pct|0));
+      if (fill)  fill.style.width = p + "%";
+      if (label) label.textContent = text ?? `Model: ${p}%`;
+      if (track) track.setAttribute("aria-valuenow", String(p));
+    },
+    setActiveModelName(name) {
+      if (activeLabel) activeLabel.textContent = name ? `Model: ${name}` : "";
     }
-  } catch (e) {
-    console.warn("[chat] load error:", e);
-  }
-  return [];
+  };
 }
 
-async function saveChatHistory(uid, history) {
-  // Store up to N most recent messages to keep the doc small
-  const MAX_MSGS = 200;
-  const trimmed = history.slice(-MAX_MSGS);
-  try {
-    const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
-    await setDoc(ref, { history: trimmed }, { merge: true });
-  } catch (e) {
-    console.warn("[chat] save error:", e);
-  }
-}
+// --- Chat wiring (app page only) ---
+async function setupWebLLMChat() {
+  if (document.body.dataset.page !== "app") return;
 
+  const logEl   = document.getElementById("chatLog");
+  const inputEl = document.getElementById("chatInput");
+  const sendBtn = document.getElementById("sendMsgBtn");
+  const loadBtn = document.getElementById("loadModelBtn");
+  const modelSel= document.getElementById("modelSelect");
+  const prog    = makeProgressBar();
 
-// Ask WebLLM which ID exists in THIS build
-const MODEL_ID = "Phi-3-mini-4k-instruct-q4f16_1-MLC";
+  // Fill selector and remember choice
+  populateModelSelect(modelSel);
+  modelSel?.addEventListener("change", () => {
+    saveModelKey(modelSel.value);
+    const m = getModelByKey(modelSel.value);
+    prog?.setActiveModelName(m.label);
+  });
 
+  // Show the current choice under the bar
+  const current = getModelByKey(getSavedModelKey());
+  prog?.setActiveModelName(current.label);
 
-  async function setupWebLLMChat() {
-    const logEl = document.getElementById("chatLog");
-    const inputEl = document.getElementById("chatInput");
-    const sendBtn = document.getElementById("sendMsgBtn");
-    const loadBtn = document.getElementById("loadModelBtn");
-    const progEl  = document.getElementById("initProgress");
-    if (!logEl || !inputEl || !sendBtn || !loadBtn) return; // not on app.html
-  
-    let engine = null;
-    const chatHistory = [{ role: "system", content: "You are a concise, helpful assistant with a very thick chinese accent and you type like you have a chinese accent" }];
-  
-    // Load existing messages for this signed-in user (if any) and render them
-const user = auth.currentUser;
-if (user) {
-  const saved = await loadChatHistory(user.uid);
-  // Prepend our system prompt (keep it at index 0); append saved turns after it
-  // If saved already included a system message, we’ll keep *our* current one and then the saved turns
-  for (const m of saved) {
-    if (m.role !== "system") chatHistory.push(m);
-  }
-  // Render into the UI so the user sees the prior convo
-  for (const m of chatHistory) {
-    if (m.role === "user") {
-      const wrap = document.createElement("div");
-      wrap.style.margin = "8px 0";
-      wrap.innerHTML = `<div class="muted" style="font-size:12px">you</div><div>${m.content.replace(/</g,"&lt;")}</div>`;
-      logEl.appendChild(wrap);
-    } else if (m.role === "assistant") {
-      const wrap = document.createElement("div");
-      wrap.style.margin = "8px 0";
-      wrap.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div>${m.content.replace(/</g,"&lt;")}</div>`;
-      logEl.appendChild(wrap);
-    }
-  }
-  logEl.scrollTop = logEl.scrollHeight;
-}
+  let engine = null;
+  const chatHistory = [{ role: "system", content: "You are a concise, friendly assistant." }];
 
+  // Load model when user clicks the button
+  loadBtn?.addEventListener("click", async () => {
+    const selected = getModelByKey(getSavedModelKey());
+    prog?.show("Model: 0%");
+    prog?.setActiveModelName(selected.label);
 
-    // --- single progress bar helper (only here, once) ---
-    function makeProgressBar() {
-        const host = document.getElementById("initProgress");
-        if (!host) return null;
-      
-        // If already created, re-use (prevents duplicates)
-        let root = host.querySelector(".webllm-progress");
-        if (!root) {
-          host.innerHTML = `
-            <div class="webllm-progress">
-              <div class="track" role="progressbar" aria-label="Model download progress"
-                   aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-                <div class="fill" id="wlmFill" style="width:0%"></div>
-              </div>
-              <div class="label muted" id="wlmLabel" aria-live="polite" style="margin-top:6px; font-size:12px;">
-                Model: 0%
-              </div>
-            </div>`;
-        }
-      
-        const label = host.querySelector("#wlmLabel");
-        const fill  = host.querySelector("#wlmFill");
-        const track = host.querySelector(".track");
-      
-        return {
-          show(text = "Model: 0%") {
-            if (label) label.textContent = text;
-            if (fill)  fill.style.width = "0%";
-            if (track) track.setAttribute("aria-valuenow", "0");
-          },
-          set(pct, text) {
-            const p = Math.max(0, Math.min(100, pct|0));
-            if (fill)  fill.style.width = p + "%";
-            if (label) label.textContent = text ?? `Model: ${p}%`;
-            if (track) track.setAttribute("aria-valuenow", String(p));
-          },
-          done(text = "Model: 100% Ready") {
-            if (fill)  fill.style.width = "100%";
-            if (label) label.textContent = text;
-            if (track) track.setAttribute("aria-valuenow", "100");
-          },
-          error(text) { if (label) label.textContent = text; }
-        };
+    const initProgressCallback = (report) => {
+      if (report.progress) {
+        const pct = Math.round(report.progress * 100);
+        prog?.set(pct, `Model: ${pct}%`);
+      } else if (report.text) {
+        prog?.set(undefined, report.text);
       }
-      
-  
-    const bar = makeProgressBar();
-    bar?.show("Idle");
-  
-    function append(role, text) {
-      const wrap = document.createElement("div");
-      wrap.style.margin = "8px 0";
-      wrap.innerHTML = `<div class="muted" style="font-size:12px">${role}</div><div>${text.replace(/</g,"&lt;")}</div>`;
-      logEl.appendChild(wrap);
+    };
+
+    // Create/replace engine with the chosen model
+    engine = await webllm.CreateWebWorkerEngine(
+      new URL("https://esm.run/@mlc-ai/web-llm@0.2.48/dist/worker.js", import.meta.url),
+      {
+        appConfig,
+        initProgressCallback,
+        model_id: selected.model_id,
+      }
+    );
+
+    prog?.set(100, "Model: 100%");
+  });
+
+  async function sendMessage() {
+    const text = (inputEl?.value || "").trim();
+    if (!text || !engine) return;
+    inputEl.value = "";
+    chatHistory.push({ role: "user", content: text });
+
+    // render user bubble
+    const u = document.createElement("div");
+    u.style.margin = "8px 0";
+    u.innerHTML = `<div class="muted" style="font-size:12px">you</div><div>${text.replace(/</g,"&lt;")}</div>`;
+    logEl.appendChild(u);
+
+    // stream assistant
+    const a = document.createElement("div");
+    a.style.margin = "8px 0";
+    a.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div></div>`;
+    const aBody = a.querySelector("div:last-child");
+    logEl.appendChild(a);
+    logEl.scrollTop = logEl.scrollHeight;
+
+    let assistantText = "";
+    const chunks = await engine.chat.completions.create({
+      stream: true,
+      messages: chatHistory
+    });
+
+    for await (const chunk of chunks) {
+      const delta = chunk?.choices?.[0]?.delta?.content || "";
+      assistantText += delta;
+      aBody.textContent = assistantText;
       logEl.scrollTop = logEl.scrollHeight;
     }
-    function setBusy(yes) {
-      sendBtn.disabled = yes;
-      inputEl.disabled = yes;
-      loadBtn.disabled = yes;
-      sendBtn.classList.toggle("loading", yes);
-    }
-  
-    // --- SINGLE click handler (keep only this one) ---
-    loadBtn.addEventListener("click", async () => {
-      if (engine) { bar?.done(`Model already loaded: ${MODEL_ID}`); return; }
-      bar?.show("Downloading model… 0%");
-  
-      try {
-        engine = await webllm.CreateMLCEngine(MODEL_ID, {
-          appConfig,
-          initProgressCallback: (p) => {
-            const pct = Math.round((p?.progress ?? 0) * 100);
-            const phase = p?.text || "Loading";
-            bar?.set(pct, `Loading — ${pct}%`);
-
-          }
-        });
-        bar?.done(`Model ready: ${MODEL_ID} (100%)`);
-        inputEl.focus();
-      } catch (e) {
-        bar?.error("Model load failed: " + (e?.message || e));
-        engine = null;
-      }
-    });
-  
-    async function sendPrompt() {
-      if (!engine) { progEl.textContent = "Load the model first."; return; }
-      const user = (inputEl.value || "").trim();
-      if (!user) return;
-      inputEl.value = "";
-      append("you", user);
-      chatHistory.push({ role: "user", content: user });
-      if (auth.currentUser) {
-        saveChatHistory(auth.currentUser.uid, chatHistory);
-      }
-  
-      setBusy(true);
-      let assistantText = "";
-      const assistantBox = document.createElement("div");
-      assistantBox.style.margin = "8px 0";
-      assistantBox.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div id="__streaming"></div>`;
-      logEl.appendChild(assistantBox);
-      const streamEl = assistantBox.querySelector("#__streaming");
-  
-      try {
-        const stream = await engine.chat.completions.create({
-          messages: chatHistory,
-          stream: true,
-          temperature: 0.7
-        });
-        for await (const delta of stream) {
-          const chunk = delta?.choices?.[0]?.delta?.content ?? "";
-          assistantText += chunk;
-          streamEl.textContent = assistantText;
-          logEl.scrollTop = logEl.scrollHeight;
-        }
-      } catch (e) {
-        try {
-          const out = await engine.chat.completions.create({
-            messages: chatHistory,
-            stream: false,
-            temperature: 0.7
-          });
-          assistantText = out?.choices?.[0]?.message?.content ?? String(out);
-          streamEl.textContent = assistantText;
-        } catch (ee) {
-          streamEl.textContent = "Error: " + (ee?.message || ee);
-        }
-      } finally {
-        if (assistantText) chatHistory.push({ role: "assistant", content: assistantText });
-        if (assistantText && auth.currentUser) {
-            saveChatHistory(auth.currentUser.uid, chatHistory);
-          }
-          
-        setBusy(false);
-      }
-    }
-  
-    sendBtn.addEventListener("click", sendPrompt);
-    inputEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendPrompt(); }
-    });
+    chatHistory.push({ role: "assistant", content: assistantText });
   }
-  
 
-// Initialize the chat only on the app page (after your auth guard)
-if (document.body.dataset.page === "app") {
-  // Optional: auto-load the model on page open:
-  // setupWebLLMChat().then(()=> document.getElementById("loadModelBtn")?.click());
-  setupWebLLMChat();
+  sendBtn?.addEventListener("click", sendMessage);
+  inputEl?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
 }
+
+// Boot the chat on app page
+setupWebLLMChat();
