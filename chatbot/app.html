@@ -29,24 +29,29 @@
         <div class="muted">UID: <span id="userUid">—</span></div>
       </div>
 
-      <!-- About -->
+      <!-- Placeholder / Next step (optional) -->
       <div class="info-card">
-        <strong>Chat</strong>
-        <div class="muted" style="margin-top:8px;">Messages are saved to your account and reloaded on sign-in.</div>
+        <strong>Next step</strong>
+        <div class="muted" style="margin-top:8px;">Chatbot area</div>
       </div>
     </div>
 
-    <!-- Chatbot (remote inference) -->
+    <!-- Chatbot (WebLLM) -->
     <div class="spacer"></div>
     <div class="info-card">
       <div class="row" style="justify-content:space-between; align-items:center;">
         <strong>Chatbot</strong>
+        <button id="loadModelBtn" class="neural-button" style="padding:0 12px; min-height:36px;">
+          <div class="button-bg"></div>
+          <span class="button-text">Load model</span>
+          <div class="button-glow"></div>
+        </button>
       </div>
 
-      <!-- chat stream -->
+      <div id="initProgress" class="muted" style="margin-top:8px; font-size:12px;"></div>
+
       <div id="chatLog" style="margin-top:12px; height:320px; overflow:auto; padding:12px; border:1px dashed rgba(255,255,255,.18); border-radius:12px; background:rgba(255,255,255,.02)"></div>
 
-      <!-- composer -->
       <div class="row" style="margin-top:12px; gap:8px;">
         <textarea id="chatInput" rows="2" placeholder="Type your message…" style="flex:1; resize:vertical; border-radius:10px; padding:10px; background:rgba(255,255,255,.05); color:#fff; border:1px solid rgba(255,255,255,.12)"></textarea>
         <button id="sendMsgBtn" class="neural-button" style="min-width:120px; min-height:42px;">
@@ -54,13 +59,28 @@
           <span class="button-text">Send</span>
           <div class="button-glow"></div>
         </button>
+        
       </div>
     </div>
 
     <div class="spacer"></div>
+
+    <!-- Optional nav buttons -->
+    <div class="stack" style="gap:16px;">
+      <a class="neural-button wide" href="index.html">
+        <div class="button-bg"></div>
+        <span class="button-text">Go to login</span>
+        <div class="button-glow"></div>
+      </a>
+      <a class="neural-button wide" href="signup.html">
+        <div class="button-bg"></div>
+        <span class="button-text">Create another account</span>
+        <div class="button-glow"></div>
+      </a>
+    </div>
   </div>
 
-  <!-- IMPORTANT: Only your app script; no @mlc-ai/web-llm -->
-  <script type="module" src="script.js?v=remote-1"></script>
+  <!-- IMPORTANT: Only your app script; do NOT include @mlc-ai/web-llm here -->
+  <script type="module" src="script.js"></script>
 </body>
 </html>

@@ -7,291 +7,444 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// Firestore (lite) – small bundle for read/write chat history
+// Firestore (lite) – tiny bundle, perfect for saving small docs
 import {
-  getFirestore,
-  doc,
-  getDoc,
-  setDoc
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
+    getFirestore,
+    doc,
+    getDoc,
+    setDoc
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
 
-// --- Your Firebase config (Web API key is fine client-side when restricted) ---
+  
+
+// 1) FILL THESE FROM Firebase Console → Project settings → Web app
 const firebaseConfig = {
   apiKey: "AIzaSyC2c5wDZDSjJT_08vUyb6P6i0Ry2bGHTZk",
   authDomain: "webchatbot-df69c.firebaseapp.com",
-  projectId: "webchatbot-df69c",
+  projectId: "webchatbot-df69c", // if your real projectId is webchatbot-df69c, change it
   appId: "1:400213955287:web:f8e3b8c1fc220a41ee5692",
 };
 
-// Init + keep session across reloads
+// 2) Init + keep session across reloads
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = getFirestore(app);   // <-- MOVE here (after app)
 await setPersistence(auth, browserLocalPersistence);
 
-// Router helpers (you already use /chatbot/)
+await setPersistence(auth, browserLocalPersistence);
+
+// Custom domain + app under /chatbot
+const REPO = "";            // not used for custom domain
+// ----- App lives under /chatbot -----
 const BASE = "/chatbot/";
+
 function go(path) {
+  // go("app.html") -> /chatbot/app.html
   window.location.href = (BASE + path).replace(/\/{2,}/g, "/");
 }
+
 function here(file) {
+  // helps guards detect current page even for /chatbot
   const p = location.pathname;
   if (file === "index.html") return /\/chatbot\/?$/.test(p) || p.endsWith("/chatbot/index.html");
   return p.endsWith("/chatbot/" + file);
 }
 
-// UI helpers
+// Shared helpers for inline errors (works with your smart-field styles)
 const $ = (sel) => document.querySelector(sel);
-function append(role, text) {
-  const logEl = $("#chatLog");
-  const wrap = document.createElement("div");
-  wrap.style.margin = "8px 0";
-  wrap.innerHTML = `<div class="muted" style="font-size:12px">${role}</div><div>${(text || "").replace(/</g,"&lt;")}</div>`;
-  logEl.appendChild(wrap);
-  logEl.scrollTop = logEl.scrollHeight;
+function setInlineError(which, msg) {
+  const id = which === "email" ? "email" : "password";
+  const field = document.getElementById(id)?.closest(".smart-field");
+  const err = document.getElementById(which === "email" ? "emailError" : "passwordError");
+  if (field) field.classList.toggle("error", !!msg);
+  if (err) { err.textContent = msg || ""; err.classList.toggle("show", !!msg); }
 }
-function setBusy(yes) {
-  const btn = $("#sendMsgBtn");
-  const input = $("#chatInput");
-  btn?.classList.toggle("loading", yes);
-  if (btn) btn.disabled = yes;
-  if (input) input.disabled = yes;
+function clearErrors() {
+  ["email","password"].forEach((w)=>{
+    const field = document.getElementById(w)?.closest(".smart-field");
+    if (field) field.classList.remove("error");
+  });
+  ["emailError","passwordError"].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) { el.textContent = ""; el.classList.remove("show"); }
+  });
+}
+function mapAuthError(e) {
+  const code = e?.code || "";
+  switch (code) {
+    case "auth/invalid-email":        return ["email","Invalid email address."];
+    case "auth/email-already-in-use": return ["email","An account already exists for this email."];
+    case "auth/weak-password":        return ["password","Use a stronger password (8+ chars)."];
+    case "auth/user-not-found":
+    case "auth/wrong-password":       return ["password","Incorrect email or password."]; 
+    case "auth/too-many-requests":    return ["password","Too many attempts. Try again later."];
+    default:                          return ["password", e?.message || "Authentication error."];
+  }
+}
+function attachCommonFieldUX() {
+  const email = document.getElementById("email");
+  const pass  = document.getElementById("password");
+  const toggle = document.getElementById("passwordToggle");
+  if (!email || !pass) return;
+
+  email.setAttribute("placeholder"," ");
+  pass.setAttribute("placeholder"," ");
+
+  email.addEventListener("input", () => setInlineError("email",""));
+  pass.addEventListener("input",  () => setInlineError("password",""));
+  email.addEventListener("blur",  () => { if (!email.value.trim()) setInlineError("email","Email address required"); });
+  pass.addEventListener("blur",   () => { if (!pass.value) setInlineError("password","Password required"); });
+
+  toggle?.addEventListener("click", ()=>{
+    const type = pass.type === "password" ? "text" : "password";
+    pass.type = type;
+    toggle.classList.toggle("toggle-active", type === "text");
+  });
+}
+function showNeuralSuccess() {
+  const form = document.querySelector("form.login-form");
+  const successBox = document.getElementById("successMessage");
+  if (!form || !successBox) return;
+  form.style.transform = "scale(0.95)";
+  form.style.opacity = "0";
+  setTimeout(() => {
+    form.style.display = "none";
+    document.querySelector(".neural-social")?.remove();
+    document.querySelector(".signup-section")?.remove();
+    document.querySelector(".auth-separator")?.remove();
+    successBox.classList.add("show");
+  }, 300);
 }
 
 // ---------- Page-specific wiring ----------
 const page = document.body.dataset.page; // "login" | "signup" | "app"
 
-// Redirect & fill account box
+// Redirect rules based on auth state
 onAuthStateChanged(auth, (user) => {
   if (page === "login" || page === "signup") {
+    // If already signed-in and we’re on auth pages, go to app
     if (user && !here("app.html")) go("app.html");
   } else if (page === "app") {
+    // If not signed-in, bounce to login
     if (!user && !here("index.html")) go("index.html");
-    const emailEl = $("#userEmail");
-    const uidEl = $("#userUid");
+
+    // Fill account box (if present)
+    const emailEl = document.getElementById("userEmail");
+    const uidEl = document.getElementById("userUid");
     if (user) {
       if (emailEl) emailEl.textContent = user.email || "(no email)";
       if (uidEl) uidEl.textContent = user.uid || "—";
-      // render saved chat on sign-in
-      loadAndRenderChatHistory().catch(console.warn);
     }
   }
 });
 
-// LOGIN handler (index.html)
+// LOGIN page: sign in submit
 if (page === "login") {
-  const form = $("#loginForm");
+  attachCommonFieldUX();
+  const form = document.getElementById("loginForm");
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
+    clearErrors();
     const email = $("#email")?.value.trim();
     const pass  = $("#password")?.value;
-    if (!email || !pass) return;
-    $("#loginForm .neural-button")?.classList.add("loading");
+    if (!email) { setInlineError("email","Email address required"); return; }
+    if (!pass)  { setInlineError("password","Password required"); return; }
+
+    const submitBtn = form.querySelector(".neural-button");
+    submitBtn?.classList.add("loading");
+    if (submitBtn) submitBtn.disabled = true;
+
     try {
       await signInWithEmailAndPassword(auth, email, pass);
-      setTimeout(()=> go("app.html"), 300);
+      showNeuralSuccess();
+      setTimeout(()=> go("app.html"), 1000);
+    } catch (err) {
+      const [where, msg] = mapAuthError(err);
+      setInlineError(where, msg);
     } finally {
-      $("#loginForm .neural-button")?.classList.remove("loading");
+      submitBtn?.classList.remove("loading");
+      if (submitBtn) submitBtn.disabled = false;
     }
   });
 }
 
-// SIGNUP handler (signup.html)
+// SIGNUP page: create account submit
 if (page === "signup") {
-  const form = $("#signupForm");
+  attachCommonFieldUX();
+  const form = document.getElementById("signupForm");
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
+    clearErrors();
     const email = $("#email")?.value.trim();
     const pass  = $("#password")?.value;
-    if (!email || !pass || pass.length < 6) return;
-    $("#signupForm .neural-button")?.classList.add("loading");
+    if (!email) { setInlineError("email","Email address required"); return; }
+    if (!pass || pass.length < 6) { setInlineError("password","Password must be at least 6 characters"); return; }
+
+    const submitBtn = form.querySelector(".neural-button");
+    submitBtn?.classList.add("loading");
+    if (submitBtn) submitBtn.disabled = true;
+
     try {
       await createUserWithEmailAndPassword(auth, email, pass);
-      setTimeout(()=> go("app.html"), 300);
+      showNeuralSuccess();
+      setTimeout(()=> go("app.html"), 1000);
+    } catch (err) {
+      const [where, msg] = mapAuthError(err);
+      setInlineError(where, msg);
     } finally {
-      $("#signupForm .neural-button")?.classList.remove("loading");
+      submitBtn?.classList.remove("loading");
+      if (submitBtn) submitBtn.disabled = false;
     }
   });
 }
 
 // APP page: sign out
 if (page === "app") {
-  $("#signOutBtn")?.addEventListener("click", async () => {
+  document.getElementById("signOutBtn")?.addEventListener("click", async () => {
     await signOut(auth);
     go("index.html");
   });
 }
 
-// ---------------- Remote Chat (Cloud Function) ----------------
-// const endpoint = "/api/chat";
-// script.js
-const endpoint = "https://api-mdnx4qrxza-uc.a.run.app/chat";
+// ---------------- WebLLM Chat (app page, single-model) ----------------
+// ---------------- WebLLM Chat (app page, single-model, auto-resolve) ----------------
+import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.48";
 
-// Load + render history saved by the server: users/{uid}/chats/main
-async function loadAndRenderChatHistory() {
-  const user = auth.currentUser;
-  if (!user) return;
+// Use the official prebuilt config so WebLLM knows about its built-in models
+const appConfig = webllm.prebuiltAppConfig;
 
-  const ref = doc(db, "users", user.uid, "chats", "main");
-  const snap = await getDoc(ref);
-
-  // Clear UI
-  const logEl = $("#chatLog");
-  if (logEl) logEl.innerHTML = "";
-
-  // (Keep a system prompt only in memory; don’t render it)
-  window._chatHistory = [
-    { role: "system", content: "You are a concise, helpful assistant. Keep answers short and on-topic." }
-  ];
-
-  if (snap.exists()) {
-    const saved = snap.data()?.history;
-    if (Array.isArray(saved)) {
-      for (const m of saved) {
-        if (m.role !== "system") {
-          window._chatHistory.push(m);
-          append(m.role === "user" ? "you" : "assistant", m.content);
-        }
-      }
-    }
+/**
+ * Pick a supported model ID from appConfig.model_list.
+ * 1) Try exact match (the one you want).
+ * 2) Try partial match containing "llama-3.2-1b-instruct".
+ * 3) Fall back to the first model in the list.
+ */
+function resolveModelId(preferredExact, preferredHint) {
+  const list = (appConfig?.model_list ?? []);
+  if (!Array.isArray(list) || list.length === 0) {
+    throw new Error("WebLLM prebuilt appConfig contains no models.");
   }
+  const exact = list.find(m => m?.model_id === preferredExact);
+  if (exact) return exact.model_id;
+
+  const hintLower = (preferredHint || "").toLowerCase();
+  const partial = list.find(m => String(m?.model_id).toLowerCase().includes(hintLower));
+  return (partial ?? list[0]).model_id;
 }
 
-async function sendPrompt() {
-  const inputEl = document.getElementById("chatInput");
-  const logEl   = document.getElementById("chatLog");
-  const text = (inputEl?.value || "").trim();
-  if (!text) return;
+// --- Chat persistence helpers (per authenticated user) ---
+const CHAT_COLLECTION = "chats";
+const CHAT_DOC = "main";   // single ongoing thread per user (rename if you want multiple)
 
-  inputEl.value = "";
-  append("you", text);
-
-  const user = auth.currentUser;
-  if (!user) { append("assistant", "Please sign in first."); return; }
-
-  let idToken;
+async function loadChatHistory(uid) {
   try {
-    idToken = await user.getIdToken();
-  } catch {
-    append("assistant", "Auth error. Please sign in again.");
-    return;
-  }
-
-  setBusy(true);
-
-  // create streaming box
-  const box = document.createElement("div");
-  box.style.margin = "8px 0";
-  box.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div id="__streaming"></div>`;
-  logEl.appendChild(box);
-  const streamEl = box.querySelector("#__streaming");
-
-  const controller = new AbortController();
-  // allow more time (cold start + long generations)
-// was 120_000
-    const timeout = setTimeout(() => controller.abort("timeout"), 180_000);
-
-  let accumulated = "";
-
-  try {
-    const resp = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + idToken,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ message: text, thread: "main" }),
-      signal: controller.signal
-    });
-
-    if (!resp.ok) {
-      const txt = await resp.text().catch(()=> "");
-      streamEl.textContent = `Server error (${resp.status}) ${txt || ""}`.trim();
-      return;
-    }
-
-    // If the server returned plain JSON (no streaming), render it
-    const ct = (resp.headers.get("content-type") || "").toLowerCase();
-    if (!resp.body || ct.includes("application/json")) {
-      try {
-        const j = await resp.json();
-        const t = j.output || j.text || j.message || JSON.stringify(j);
-        streamEl.textContent = t;
-      } catch {
-        streamEl.textContent = "No response received.";
-      }
-      return;
-    }
-
-    // SSE-style stream (OpenAI / event: data frames)
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-
-    for (;;) {
-      const r = await reader.read();
-      if (r.done) break;
-      const chunk = decoder.decode(r.value);
-
-      // Accept both "data: {...}\n\n" and "event: ...\ndata: {...}\n\n"
-      let pendingEvent = "message";
-      for (const rawLine of chunk.split("\n")) {
-        const line = rawLine.trim();
-        if (!line) continue;
-
-        if (line.startsWith("event:")) {
-          pendingEvent = line.slice(6).trim(); // e.g., "error" or "done"
-          continue;
-        }
-        if (!line.startsWith("data:")) continue;
-
-        const payload = line.slice(5).trim();
-
-        if (pendingEvent === "error") {
-          try {
-            const { error } = JSON.parse(payload);
-            streamEl.textContent = "Error: " + (error || "Unknown error");
-          } catch {
-            streamEl.textContent = "Error (no details)";
-          }
-          continue;
-        }
-
-        if (payload === "[DONE]") continue;
-
-        try {
-          const obj = JSON.parse(payload);
-          const delta = obj?.choices?.[0]?.delta?.content || "";
-          if (delta) {
-            accumulated += delta;
-            streamEl.textContent = accumulated;
-            logEl.scrollTop = logEl.scrollHeight;
-          }
-        } catch {
-          // Non-JSON keepalive; ignore
-        }
-      }
-    }
-
-    if (!accumulated && !streamEl.textContent) {
-      streamEl.textContent = "No response received.";
+    const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data();
+      return Array.isArray(data?.history) ? data.history : [];
     }
   } catch (e) {
-    streamEl.textContent = (e?.name === "AbortError")
-      ? "Timed out. Please try again."
-      : "Network error: " + String(e?.message || e);
-  } finally {
-    clearTimeout(timeout);
-    setBusy(false);
+    console.warn("[chat] load error:", e);
+  }
+  return [];
+}
+
+async function saveChatHistory(uid, history) {
+  // Store up to N most recent messages to keep the doc small
+  const MAX_MSGS = 200;
+  const trimmed = history.slice(-MAX_MSGS);
+  try {
+    const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
+    await setDoc(ref, { history: trimmed }, { merge: true });
+  } catch (e) {
+    console.warn("[chat] save error:", e);
   }
 }
 
-// Wire up composer
-if (page === "app") {
-  $("#sendMsgBtn")?.addEventListener("click", sendPrompt);
-  $("#chatInput")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendPrompt(); }
-  });
+
+// Ask WebLLM which ID exists in THIS build
+const MODEL_ID = "Phi-3-mini-4k-instruct-q4f16_1-MLC";
+
+
+  async function setupWebLLMChat() {
+    const logEl = document.getElementById("chatLog");
+    const inputEl = document.getElementById("chatInput");
+    const sendBtn = document.getElementById("sendMsgBtn");
+    const loadBtn = document.getElementById("loadModelBtn");
+    const progEl  = document.getElementById("initProgress");
+    if (!logEl || !inputEl || !sendBtn || !loadBtn) return; // not on app.html
+  
+    let engine = null;
+    const chatHistory = [{ role: "system", content: "You are a concise, helpful assistant with a very thick chinese accent and you type like you have a chinese accent" }];
+  
+    // Load existing messages for this signed-in user (if any) and render them
+const user = auth.currentUser;
+if (user) {
+  const saved = await loadChatHistory(user.uid);
+  // Prepend our system prompt (keep it at index 0); append saved turns after it
+  // If saved already included a system message, we’ll keep *our* current one and then the saved turns
+  for (const m of saved) {
+    if (m.role !== "system") chatHistory.push(m);
+  }
+  // Render into the UI so the user sees the prior convo
+  for (const m of chatHistory) {
+    if (m.role === "user") {
+      const wrap = document.createElement("div");
+      wrap.style.margin = "8px 0";
+      wrap.innerHTML = `<div class="muted" style="font-size:12px">you</div><div>${m.content.replace(/</g,"&lt;")}</div>`;
+      logEl.appendChild(wrap);
+    } else if (m.role === "assistant") {
+      const wrap = document.createElement("div");
+      wrap.style.margin = "8px 0";
+      wrap.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div>${m.content.replace(/</g,"&lt;")}</div>`;
+      logEl.appendChild(wrap);
+    }
+  }
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+
+    // --- single progress bar helper (only here, once) ---
+    function makeProgressBar() {
+      const host = document.getElementById("initProgress");
+      if (!host) return null;
+      let root = host.querySelector(".webllm-progress");
+      if (!root) {
+        host.innerHTML = `
+          <div class="webllm-progress">
+            <div class="label" id="wlmLabel">Idle</div>
+            <div class="track"><div class="fill" id="wlmFill" style="width:0%"></div></div>
+          </div>`;
+      }
+      const label = host.querySelector("#wlmLabel");
+      const fill  = host.querySelector("#wlmFill");
+      return {
+        show(text = "Starting… 0%") {
+          if (label) label.textContent = text;
+          if (fill)  fill.style.width = "0%";
+        },
+        set(pct, text) {
+          const p = Math.max(0, Math.min(100, pct|0));
+          if (fill)  fill.style.width = p + "%";
+          if (label) label.textContent = text ?? `Loading… ${p}%`;
+        },
+        done(text = "Model ready (100%)") {
+          if (fill)  fill.style.width = "100%";
+          if (label) label.textContent = text;
+        },
+        error(text) { if (label) label.textContent = text; }
+      };
+    }
+  
+    const bar = makeProgressBar();
+    bar?.show("Idle");
+  
+    function append(role, text) {
+      const wrap = document.createElement("div");
+      wrap.style.margin = "8px 0";
+      wrap.innerHTML = `<div class="muted" style="font-size:12px">${role}</div><div>${text.replace(/</g,"&lt;")}</div>`;
+      logEl.appendChild(wrap);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    function setBusy(yes) {
+      sendBtn.disabled = yes;
+      inputEl.disabled = yes;
+      loadBtn.disabled = yes;
+      sendBtn.classList.toggle("loading", yes);
+    }
+  
+    // --- SINGLE click handler (keep only this one) ---
+    loadBtn.addEventListener("click", async () => {
+      if (engine) { bar?.done(`Model already loaded: ${MODEL_ID}`); return; }
+      bar?.show("Downloading model… 0%");
+  
+      try {
+        engine = await webllm.CreateMLCEngine(MODEL_ID, {
+          appConfig,
+          initProgressCallback: (p) => {
+            const pct = Math.round((p?.progress ?? 0) * 100);
+            const phase = p?.text || "Loading";
+            bar?.set(pct, `Loading — ${pct}%`);
+
+          }
+        });
+        bar?.done(`Model ready: ${MODEL_ID} (100%)`);
+        inputEl.focus();
+      } catch (e) {
+        bar?.error("Model load failed: " + (e?.message || e));
+        engine = null;
+      }
+    });
+  
+    async function sendPrompt() {
+      if (!engine) { progEl.textContent = "Load the model first."; return; }
+      const user = (inputEl.value || "").trim();
+      if (!user) return;
+      inputEl.value = "";
+      append("you", user);
+      chatHistory.push({ role: "user", content: user });
+      if (auth.currentUser) {
+        saveChatHistory(auth.currentUser.uid, chatHistory);
+      }
+  
+      setBusy(true);
+      let assistantText = "";
+      const assistantBox = document.createElement("div");
+      assistantBox.style.margin = "8px 0";
+      assistantBox.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div id="__streaming"></div>`;
+      logEl.appendChild(assistantBox);
+      const streamEl = assistantBox.querySelector("#__streaming");
+  
+      try {
+        const stream = await engine.chat.completions.create({
+          messages: chatHistory,
+          stream: true,
+          temperature: 0.7
+        });
+        for await (const delta of stream) {
+          const chunk = delta?.choices?.[0]?.delta?.content ?? "";
+          assistantText += chunk;
+          streamEl.textContent = assistantText;
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+      } catch (e) {
+        try {
+          const out = await engine.chat.completions.create({
+            messages: chatHistory,
+            stream: false,
+            temperature: 0.7
+          });
+          assistantText = out?.choices?.[0]?.message?.content ?? String(out);
+          streamEl.textContent = assistantText;
+        } catch (ee) {
+          streamEl.textContent = "Error: " + (ee?.message || ee);
+        }
+      } finally {
+        if (assistantText) chatHistory.push({ role: "assistant", content: assistantText });
+        if (assistantText && auth.currentUser) {
+            saveChatHistory(auth.currentUser.uid, chatHistory);
+          }
+          
+        setBusy(false);
+      }
+    }
+  
+    sendBtn.addEventListener("click", sendPrompt);
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendPrompt(); }
+    });
+  }
+  
+
+// Initialize the chat only on the app page (after your auth guard)
+if (document.body.dataset.page === "app") {
+  // Optional: auto-load the model on page open:
+  // setupWebLLMChat().then(()=> document.getElementById("loadModelBtn")?.click());
+  setupWebLLMChat();
 }

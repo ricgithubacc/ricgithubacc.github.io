@@ -118,9 +118,11 @@ app.post('/chat', verifyAuth, async (req, res) => {
 
   // Keep the HTTP stream active every 15s while waiting on upstream
   const keepalive = setInterval(() => {
+    // AFTER (valid)
+    // AFTER (valid)
     try {
-      res.write(':\n\n');
-    } catch {}
+      res.write(':\\n\\n');
+    } catch (e) {/* ignore */}
   }, 15000);
 
   try {
