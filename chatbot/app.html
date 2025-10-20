@@ -3,24 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>App · Chatbot</title>
+  <title>Chat Bot</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body data-page="app">
-  <!-- Background -->
+  <!-- Shared neural background (matches index/signup) -->
   <div class="neural-background">
     <div class="neural-node"></div><div class="neural-node"></div>
     <div class="neural-node"></div><div class="neural-node"></div>
     <div class="neural-node"></div>
   </div>
 
-  <div class="container page-shell" style="max-width:1100px;">
-    <!-- Header -->
-    <header class="top-bar" style="gap:12px; align-items:center;">
-      <div class="row" style="gap:12px; align-items:center;">
-        <div class="ai-logo" aria-hidden="true" style="transform:scale(.9)">
+  <!-- Centered shell like login/signup, but roomy enough for two cards -->
+  <div class="login-container" style="max-width:1120px;">
+    <div class="login-card" style="padding:18px 18px 22px;">
+      <div class="ai-glow"></div>
+
+      <!-- Header matches index/signup -->
+      <div class="login-header" style="margin-bottom:14px;">
+        <div class="ai-logo">
           <div class="logo-core">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
               <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"
                     stroke="currentColor" stroke-width="1.5"/>
@@ -32,166 +35,146 @@
             <div class="ring ring-3"></div>
           </div>
         </div>
-        <h1 class="muted" style="margin:0; letter-spacing:.2px;">Your Chatbot</h1>
-        <!-- (Removed the "Signed in" badge) -->
+        <h1>Welcome</h1>
+        <p>Chat with your on-device model</p>
       </div>
 
-      <nav class="row" style="margin-left:auto; gap:10px;">
+      <!-- Top right action (same button style as auth pages) -->
+      <div class="row" style="justify-content:flex-end; margin-bottom:16px;">
         <button id="signOutBtn" class="neural-button signout-big" title="Sign out">
           <div class="button-bg"></div>
           <span class="button-text">Sign out</span>
+          <div class="button-loader" aria-hidden="true">
+            <div class="neural-spinner">
+              <div class="spinner-segment"></div>
+              <div class="spinner-segment"></div>
+              <div class="spinner-segment"></div>
+            </div>
+          </div>
           <div class="button-glow"></div>
         </button>
-      </nav>
-    </header>
-
-    <!-- Welcome -->
-    <section class="info-card glass-card section-block">
-      <div class="row" style="justify-content:space-between; align-items:center; gap:12px;">
-        <div>
-          <h2 style="margin:0 0 4px 0;">Welcome <span class="wave" aria-hidden="true">👋</span></h2>
-          <p class="muted" style="margin:0">You’re successfully signed in.</p>
-        </div>
       </div>
-    </section>
 
-    <!-- Main two-column layout -->
-    <div class="grid two section-grid">
-      <!-- Account -->
-      <section class="info-card glass-card">
-        <strong id="accountTitle">Account</strong>
-        <div class="muted" style="margin-top:10px;">Email: <span id="userEmail">(loading…)</span></div>
-        <!-- Keep UID node for safety but hidden -->
-        <div style="display:none;">UID: <span id="userUid"></span></div>
+      <!-- Two-column content, styled to feel like two “login-card” halves -->
+      <div class="section-grid" style="display:grid; grid-template-columns:1fr 1.6fr; gap:28px;">
+        <!-- Account card (left) -->
+        <section class="info-card glass-card" style="position:relative; padding:16px 16px 18px;">
+          <div class="ai-glow" aria-hidden="true"></div>
+          <strong id="accountTitle" style="display:block; margin-bottom:8px;">Account</strong>
+          <div class="muted" style="margin-top:6px;">Email: <span id="userEmail">(loading…)</span></div>
+          <!-- Keep UID node for safety but hidden -->
+          <div style="display:none;">UID: <span id="userUid"></span></div>
 
-        <div class="spacer" style="height:12px;"></div>
+          <div class="spacer" style="height:12px;"></div>
 
-        <!-- Load AI + single progress host (script.js renders the bar + "Model:" here) -->
-        <div class="row" style="gap:12px; align-items:center; flex-wrap:wrap;">
-          <button id="loadModelBtn" class="neural-button" style="min-height:42px;" title="Download and initialize the on-device model">
-            <div class="button-bg"></div>
-            <span class="button-text">Load AI</span>
-            <div class="button-glow"></div>
-          </button>
-
-          <div class="progress-wrap" style="min-width:260px; flex:1; max-width:600px;">
-            <div id="initProgress"></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Chat -->
-      <section class="info-card glass-card" aria-labelledby="chatTitle" style="display:flex; flex-direction:column;">
-        <div class="row" style="justify-content:space-between; align-items:center;">
-          <strong id="chatTitle">Chatbot</strong>
-        </div>
-
-        <!-- History -->
-        <div id="chatLog" aria-live="polite" aria-label="Chat history"
-             style="margin-top:12px; height:clamp(260px, 40vh, 420px); overflow:auto; padding:12px; border-radius:16px; background:rgba(255,255,255,.03); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);">
-        </div>
-
-        <!-- Composer: textarea full width ABOVE send -->
-        <div class="stack" style="margin-top:12px; gap:10px;">
-          <label for="chatInput" class="visually-hidden">Message</label>
-          <textarea id="chatInput" rows="3" placeholder="Type your message…"
-            style="width:100%; resize:vertical; border-radius:14px; padding:12px; background:rgba(255,255,255,.05); color:inherit; border:0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08)"></textarea>
-
-          <div class="row" style="justify-content:flex-end;">
-            <button id="sendMsgBtn" class="neural-button" style="min-width:140px; min-height:46px;" title="Send message">
+          <!-- Load AI + progress host (script.js renders the bar + “Model:” under it) -->
+          <div class="row" style="gap:12px; align-items:center; flex-wrap:wrap;">
+            <button id="loadModelBtn" class="neural-button" style="min-height:42px;" title="Download and initialize the on-device model">
               <div class="button-bg"></div>
-              <span class="button-text">Send</span>
+              <span class="button-text">Load AI</span>
               <div class="button-glow"></div>
             </button>
-          </div>
-        </div>
-      </section>
-    </div>
 
-    <!-- Footer -->
-    <footer class="stack" style="gap:10px; margin-top:28px;">
-      <div class="muted" style="font-size:12px; text-align:center;">
-        Need to switch accounts? Use the Sign Out button above.
+            <div class="progress-wrap" style="min-width:260px; flex:1; max-width:600px;">
+              <div id="initProgress"></div>
+            </div>
+          </div>
+
+          <p class="muted" style="font-size:12px; line-height:1.4; margin:12px 0 0;">
+            Tip: After loading, press <kbd>Enter</kbd> to send, or <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line.
+          </p>
+        </section>
+
+        <!-- Chat card (right) -->
+        <section class="info-card glass-card" aria-labelledby="chatTitle" style="position:relative; padding:16px 16px 18px; display:flex; flex-direction:column;">
+          <div class="ai-glow" aria-hidden="true"></div>
+          <div class="row" style="justify-content:space-between; align-items:center;">
+            <strong id="chatTitle">Chatbot</strong>
+          </div>
+
+          <!-- History (same rounded/glass language as auth inputs/buttons) -->
+          <div id="chatLog" aria-live="polite" aria-label="Chat history"
+               style="margin-top:12px; height:clamp(260px, 40vh, 420px); overflow:auto; padding:12px; border-radius:16px; background:rgba(255,255,255,.03); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);">
+          </div>
+
+          <!-- Composer: textarea full width ABOVE send (mirrors tidy, rounded inputs) -->
+          <div class="stack" style="margin-top:12px; gap:10px;">
+            <label for="chatInput" class="visually-hidden">Message</label>
+            <textarea id="chatInput" rows="3" placeholder="Type your message…"
+              style="width:100%; resize:vertical; border-radius:14px; padding:12px; background:rgba(255,255,255,.05); color:inherit; border:0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08)"></textarea>
+
+            <div class="row" style="justify-content:flex-end;">
+              <button id="sendMsgBtn" class="neural-button" style="min-width:140px; min-height:46px;" title="Send message">
+                <div class="button-bg"></div>
+                <span class="button-text">Send</span>
+                <div class="button-glow"></div>
+              </button>
+            </div>
+          </div>
+        </section>
       </div>
-    </footer>
+
+      <!-- Subtle footer like auth pages -->
+      <div style="margin-top:24px; text-align:center;">
+        <p class="muted" style="font-size:12px;">Signed in? You can always <a href="index.html" class="neural-login">switch accounts</a>.</p>
+      </div>
+    </div>
   </div>
 
-  <!-- Your app script -->
-  <script type="module" src="script.js"></script>
+  <!-- Load your JS as a module so Firebase imports work -->
+  <script src="script.js" type="module"></script>
 
-  <!-- Local overrides (glass + spacing + scroll + big sign out) -->
+  <!-- Small local tweaks to align with auth pages -->
   <style>
-    /* Ensure the page always scrolls at 100% zoom */
-    html, body { height: auto !important; min-height: 100%; overflow-y: auto !important; }
-    body { overscroll-behavior-y: contain; }
+    /* Ensure scroll at 100% zoom */
+    html, body { height:auto; min-height:100%; overflow-y:auto; }
+    body { overscroll-behavior-y:contain; }
 
-    /* Roomy layout */
-    .page-shell { padding-top: 20px; padding-bottom: 56px; }
-    .section-block { margin-top: 16px; margin-bottom: 22px; }
-    .section-grid { gap: 28px !important; margin-top: 8px; margin-bottom: 12px; }
+    /* Match spacing language from auth screens */
+    .section-grid { gap:28px !important; }
+    @media (max-width: 980px) {
+      .section-grid { grid-template-columns:1fr; }
+    }
 
-    /* Glass cards (rounded, no boxy borders) */
+    /* Glass cards mimic login-card internals */
     .glass-card {
-      border: 0 !important;
-      border-radius: 22px !important;
-      background: rgba(255,255,255,0.06) !important;
+      border:0;
+      border-radius:22px;
+      background:rgba(255,255,255,0.06);
       box-shadow:
         0 10px 30px rgba(0,0,0,.25),
         inset 0 0 0 1px rgba(255,255,255,.08);
       backdrop-filter: blur(10px) saturate(130%);
       -webkit-backdrop-filter: blur(10px) saturate(130%);
-      padding: 16px 16px 18px;
     }
 
-    /* BIGGER Sign out button */
+    /* Buttons match the neural style used on index/signup */
     .signout-big {
-      min-width: 160px;
-      min-height: 50px;
-      padding: 10px 18px;
-      font-size: 16px;
-      font-weight: 600;
-      border-radius: 16px !important;
+      min-width:160px; min-height:50px; padding:10px 18px;
+      font-size:16px; font-weight:600; border-radius:16px;
     }
-
-    /* Glass buttons */
-    .neural-button { background: transparent !important; border-radius: 14px !important; }
+    .neural-button { background:transparent; border-radius:14px; }
     .neural-button .button-bg {
-      background: rgba(255,255,255,0.06) !important;
-      border: 0 !important;
-      box-shadow:
-        0 6px 18px rgba(0,0,0,.25),
-        inset 0 0 0 1px rgba(255,255,255,.10);
+      background:rgba(255,255,255,0.06);
+      box-shadow: 0 6px 18px rgba(0,0,0,.25), inset 0 0 0 1px rgba(255,255,255,.10);
       backdrop-filter: blur(10px) saturate(140%);
       -webkit-backdrop-filter: blur(10px) saturate(140%);
-      border-radius: 14px !important;
+      border:0; border-radius:14px;
     }
-    .neural-button .button-text { color: rgba(255,255,255,0.95) !important; }
+    .neural-button .button-text { color:rgba(255,255,255,0.95); }
     .neural-button:hover .button-bg {
-      background: rgba(255,255,255,0.12) !important;
-      transform: translateY(-1px);
-      box-shadow:
-        0 10px 22px rgba(0,0,0,.28),
-        inset 0 0 0 1px rgba(255,255,255,.16);
+      background:rgba(255,255,255,0.12);
+      transform:translateY(-1px);
+      box-shadow: 0 10px 22px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.16);
     }
     .neural-button:active .button-bg {
-      transform: translateY(0);
-      box-shadow:
-        0 6px 16px rgba(0,0,0,.22),
-        inset 0 0 0 1px rgba(255,255,255,.12);
-    }
-    .neural-button .button-glow { opacity: .35; }
-
-    /* Responsive tweaks */
-    @media (max-width: 880px) {
-      #chatLog { height: clamp(220px, 38vh, 360px); }
-      .section-grid { gap: 22px !important; }
-      .signout-big { min-width: 140px; min-height: 48px; }
+      transform:translateY(0);
+      box-shadow: 0 6px 16px rgba(0,0,0,.22), inset 0 0 0 1px rgba(255,255,255,.12);
     }
 
-    /* a11y helper */
+    /* a11y helper (matches earlier pages) */
     .visually-hidden {
-      position:absolute !important;
-      height:1px; width:1px;
+      position:absolute !important; height:1px; width:1px;
       overflow:hidden; clip:rect(1px,1px,1px,1px);
       white-space:nowrap; border:0; padding:0; margin:-1px;
     }
