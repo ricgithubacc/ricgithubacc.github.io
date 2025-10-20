@@ -149,6 +149,46 @@ document.addEventListener("DOMContentLoaded", () => {
 let engine = null;
 let chatHistory = [{ role: "system", content: "You are a helpful assistant." }];
 
+// === Chat persistence (per-user, localStorage) ===
+function chatStorageKey(uid) {
+  return `chat:v1:${uid || "anon"}`;
+}
+function saveChat(uid) {
+  try {
+    localStorage.setItem(chatStorageKey(uid), JSON.stringify(chatHistory));
+  } catch (e) {
+    console.warn("Failed to persist chat", e);
+  }
+}
+function loadChat(uid) {
+  try {
+    const raw = localStorage.getItem(chatStorageKey(uid));
+    if (!raw) return null;
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return null;
+    // keep only messages with role + content
+    return arr.filter(
+      (m) =>
+        m &&
+        typeof m.content === "string" &&
+        (m.role === "user" || m.role === "assistant" || m.role === "system")
+    );
+  } catch (e) {
+    console.warn("Failed to load chat", e);
+    return null;
+  }
+}
+function renderChatToLog() {
+  const log = $("#chatLog");
+  if (!log) return;
+  log.innerHTML = "";
+  (chatHistory || []).forEach((m) => {
+    if (m.role === "system") return; // don't render system prompt
+    appendMsg(m.role, m.content);
+  });
+}
+
+
 // Single, determinate progress bar under #initProgress (no duplicates)
 function makeProgressBar() {
   const host = $("#initProgress");
@@ -194,6 +234,20 @@ function makeProgressBar() {
   };
 }
 const bar = makeProgressBar();
+
+// Restore chat from storage on app page when user is signed in
+document.addEventListener("DOMContentLoaded", () => {
+  if (page !== "app") return;
+  onAuthStateChanged(auth, (user) => {
+    if (!user) return;
+    const loaded = loadChat(user.uid);
+    if (loaded && loaded.length) {
+      chatHistory = loaded;
+      renderChatToLog();
+    }
+  });
+});
+
 
 // Append message to chat log
 function appendMsg(role, text) {
@@ -285,6 +339,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Build history + query
     chatHistory.push({ role: "user", content: text });
+    try { saveChat(auth.currentUser && auth.currentUser.uid); } catch {}
+
 
     try {
       // Prefer modern chat.completions API if present
@@ -304,6 +360,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       chatHistory.push({ role: "assistant", content: reply });
+      try { saveChat(auth.currentUser && auth.currentUser.uid); } catch {}
+
       appendMsg("assistant", reply);
     } catch (err) {
       console.error(err);
