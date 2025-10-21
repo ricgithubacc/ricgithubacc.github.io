@@ -68,29 +68,21 @@
           <div class="spacer" style="height:12px;"></div>
 
           <!-- Load AI + progress host (script.js renders the bar + “Model:” under it) -->
-<div class="row" style="gap:12px; align-items:center; flex-wrap:wrap;">
-  <!-- NEW: super-lightweight model selector -->
-  <label for="modelSelect" class="muted" style="font-size:12px;">Model</label>
-<select id="modelSelect" style="min-height:42px; border-radius:10px; padding:8px 10px;">
-  <option value="phi3" selected>Phi-3 mini 4k (light)</option>
-  <option value="llama1b">Llama-3.2-1B-Instruct (light)</option>
-  <option value="qwen05b">Qwen-2.5-0.5B-Instruct (ultra-light)</option>
-</select>
+          <div class="row" style="gap:12px; align-items:center; flex-wrap:wrap;">
+            <button id="loadModelBtn" class="neural-button" style="min-height:42px;" title="Download and initialize the on-device model">
+              <div class="button-bg"></div>
+              <span class="button-text">Load AI</span>
+              <div class="button-glow"></div>
+            </button>
 
+            <div class="progress-wrap" style="min-width:260px; flex:1; max-width:600px;">
+              <div id="initProgress"></div>
+            </div>
+          </div>
 
-  <button id="loadModelBtn" class="neural-button" style="min-height:42px;" title="Download and initialize the on-device model">
-    <div class="button-bg"></div>
-    <span class="button-text">Load AI</span>
-    <div class="button-glow"></div>
-  </button>
-
-  <div class="progress-wrap" style="min-width:260px; flex:1; max-width:600px;">
-    <div id="initProgress"></div>
-    <div id="activeModelLabel" class="muted" style="margin-top:6px; font-size:12px;"></div>
-  </div>
-</div>
-
-
+          <p class="muted" style="font-size:12px; line-height:1.4; margin:12px 0 0;">
+            Tip: After loading, press <kbd>Enter</kbd> to send, or <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line.
+          </p>
         </section>
 
         <!-- Chat card (right) -->
@@ -124,21 +116,11 @@
 
       <!-- Subtle footer like auth pages -->
       <div style="margin-top:24px; text-align:center;">
-        <p class="muted" style="font-size:12px;">Want to sign out? Click Sign Out at the top of the screen.</p>
+        <p class="muted" style="font-size:12px;">Signed in? You can always <a href="index.html" class="neural-login">switch accounts</a>.</p>
       </div>
     </div>
   </div>
-<script>
-    window.firebaseConfig = {
-    apiKey: "AIzaSyC2c5wDZDSjJT_08vUyb6P6i0Ry2bGHTZk",
-    authDomain: "webchatbot-df69c.firebaseapp.com",
-    projectId: "webchatbot-df69c",
-    storageBucket: "webchatbot-df69c.firebasestorage.app",
-    messagingSenderId: "400213955287",
-    appId: "1:400213955287:web:f8e3b8c1fc220a41ee5692",
-    measurementId: "G-EFPFJG4EWH"
-  };
-</script>
+
   <!-- Load your JS as a module so Firebase imports work -->
   <script src="script.js" type="module"></script>
 
