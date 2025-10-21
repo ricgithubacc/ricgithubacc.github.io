@@ -100,11 +100,21 @@ function attachCommonFieldUX() {
   email.addEventListener("blur",  () => { if (!email.value.trim()) setInlineError("email","Email address required"); });
   pass.addEventListener("blur",   () => { if (!pass.value) setInlineError("password","Password required"); });
 
-  toggle?.addEventListener("click", ()=>{
-    const type = pass.type === "password" ? "text" : "password";
-    pass.type = type;
-    toggle.classList.toggle("toggle-active", type === "text");
-  });
+  // inside attachCommonFieldUX()
+toggle?.addEventListener("click", (e) => {
+  e.preventDefault();
+  const showing = pass.type !== "text";
+  pass.type = showing ? "text" : "password";
+
+  // keep icon/state in sync with your CSS
+  toggle.setAttribute("aria-pressed", String(showing));
+  toggle.classList.toggle("toggle-active", showing);
+
+  // keep caret visible after type flip
+  try { pass.focus({ preventScroll: true }); } catch (_) {}
+  const v = pass.value; pass.value = ""; pass.value = v;
+}, { passive: false });
+
 }
 function showNeuralSuccess() {
   const form = document.querySelector("form.login-form");
@@ -281,7 +291,7 @@ const MODEL_ID = "TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC";
     if (!logEl || !inputEl || !sendBtn || !loadBtn) return; // not on app.html
   
     let engine = null;
-    const chatHistory = [{ role: "system", content: "You are a concise, helpful assistant with a very thick chinese accent and you type like you have a chinese accent" }];
+    const chatHistory = [{ role: "system", content: "You are a concise, helpful assistant." }];
   
     // Load existing messages for this signed-in user (if any) and render them
 const user = auth.currentUser;
