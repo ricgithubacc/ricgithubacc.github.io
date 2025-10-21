@@ -10,8 +10,8 @@
       height: 100%;
       margin: 0;
       display: flex;
-      justify-content: center;
-      align-items: center;
+      justify-content:center;
+      align-items:center;
       font-family: 'Roboto Mono', monospace;
       background: linear-gradient(1deg, #0f2027, #203a43, #2c5364);
       color: white;
@@ -58,13 +58,20 @@
       gap: 8px;
       margin: 8px 0;
     }
-    #score, #credits, #message, #stats {
+    #score, #credits, #message {
       font-size: 1.1rem;
       margin: 8px 0;
     }
     #message {
       height: 1.2em;
       font-weight: bold;
+    }
+    #loanBtn {
+      display: none;
+      background-color: #e67e22;
+    }
+    #loanBtn:hover {
+      background-color: #d35400;
     }
   </style>
 </head>
@@ -81,11 +88,11 @@
       <span id="speedDisplay">500</span>ms
     </label>
     <p id="score">Balls Dropped: 0</p>
-    <p id="stats">Wins: 0 | Losses: 0 | Win %: 0%</p>
     <p id="message"></p>
     <canvas id="plinko" width="360" height="500"></canvas>
     <button onclick="dropBall()">Drop Ball</button>
     <button onclick="resetGame()" id="resetBtn" style="display:none;">Reset Game</button>
+    <button onclick="takeLoan()" id="loanBtn">💸 Take Loan (+100)</button>
   </div>
 
   <script>
@@ -99,15 +106,13 @@
     const BIN_HEIGHT = 40;
 
     const bins = Array(COLS).fill(0);
-    const binScores = [0, 0.5, 1, 2, 5, 2, 1, 0.5, 0];
+    const binScores = [0, 0.25, 0.5, 2, 5, 3, 0.5, 0.25, 0];
     const pegs = [];
     const balls = [];
     const particles = [];
 
     let totalBalls = 0;
     let credits = 100;
-    let winCount = 0;
-    let lossCount = 0;
     let autoInterval = null;
 
     class Ball {
@@ -146,17 +151,11 @@
           credits += winAmount;
           totalBalls++;
 
-          if (winAmount > 0) {
-            winCount++;
-            for (let i = 0; i < 20; i++) {
-              particles.push(new Particle(this.x, this.y));
-            }
-            showMessage(`🪙 +${winAmount} coins!`);
-          } else {
-            lossCount++;
-            showMessage("😢 No win");
+          for (let i = 0; i < 20; i++) {
+            particles.push(new Particle(this.x, this.y));
           }
 
+          showMessage(winAmount > 0 ? `🪙 +${winAmount} coins!` : "😢 No win");
           updateDisplay();
           return true;
         }
@@ -267,8 +266,8 @@
 
       if (credits <= 0) {
         stopAuto();
-        document.getElementById("resetBtn").style.display = "inline-block";
-        showMessage("💸 Out of credits! Click Reset.");
+        document.getElementById("loanBtn").style.display = "inline-block";
+        showMessage("💸 Out of credits! Take a loan?");
       }
     }
 
@@ -279,7 +278,7 @@
         autoInterval = setInterval(() => {
           if (credits <= 0) {
             stopAuto();
-            document.getElementById("resetBtn").style.display = "inline-block";
+            document.getElementById("loanBtn").style.display = "inline-block";
             return;
           }
           dropBall();
@@ -298,13 +297,18 @@
     }
 
     function updateDisplay() {
-      document.getElementById("credits").textContent = `Credits: ${credits}`;
+      const creditText = credits >= 0
+        ? `Credits: ${credits}`
+        : `Credits: 0 | Debt: ${-credits}`;
+      document.getElementById("credits").textContent = creditText;
       document.getElementById("score").textContent = `Balls Dropped: ${totalBalls}`;
       document.getElementById("speedDisplay").textContent = document.getElementById("speedSlider").value;
 
-      const total = winCount + lossCount;
-      const winPercent = total ? ((winCount / total) * 100).toFixed(1) : "0";
-      document.getElementById("stats").textContent = `Wins: ${winCount} | Losses: ${lossCount} | Win %: ${winPercent}%`;
+      if (credits <= 0) {
+        document.getElementById("loanBtn").style.display = "inline-block";
+      } else {
+        document.getElementById("loanBtn").style.display = "none";
+      }
     }
 
     function showMessage(msg) {
@@ -313,13 +317,19 @@
       el.style.color = msg.includes("+") ? "lime" : msg.includes("⚠️") ? "yellow" : "red";
     }
 
+    function takeLoan() {
+      credits += 100;
+      updateDisplay();
+      document.getElementById("loanBtn").style.display = "none";
+      showMessage("✅ Loan granted: +100 credits");
+    }
+
     function resetGame() {
       credits = 100;
       totalBalls = 0;
-      winCount = 0;
-      lossCount = 0;
       updateDisplay();
       document.getElementById("resetBtn").style.display = "none";
+      document.getElementById("loanBtn").style.display = "none";
       showMessage("");
     }
 

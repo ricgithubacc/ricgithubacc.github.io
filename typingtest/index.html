@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Typing Test</title>
+  <style>
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+      color: white;
+      text-align: center;
+      padding: 30px;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    #quote {
+      font-size: 24px;
+      margin: 20px auto;
+      padding: 20px;
+      border: 2px solid white;
+      border-radius: 10px;
+      max-width: 800px;
+      line-height: 1.5;
+    }
+    #quote span.correct {
+      color: #00FF00;
+    }
+    #quote span.incorrect {
+      color: #FF5555;
+    }
+    #input {
+      font-size: 20px;
+      width: 80%;
+      padding: 10px;
+      margin-top: 20px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+      background: #eee;
+      color: #333;
+    }
+    #stats {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+    button {
+      margin: 15px 5px;
+      padding: 10px 20px;
+      font-size: 18px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      background: white;
+      color: #2c5364;
+      transition: background 0.3s, transform 0.2s;
+    }
+    button:hover {
+      background: #ddd;
+      transform: scale(1.05);
+    }
+    #countdown {
+      font-size: 20px;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Typing Test</h1>
+
+  <div id="quote">Press Start to begin...</div>
+
+  <input type="text" id="input" placeholder="Start typing..." disabled>
+
+  <div id="stats">
+    Time: <span id="time">0</span>s | Accuracy: <span id="accuracy">100%</span> | WPM: <span id="wpm">0</span>
+  </div>
+
+  <div id="countdown"></div>
+
+  <button onclick="startTest()">Start Test</button>
+  <button onclick="restartTest()">Restart</button>
+
+  <script>
+    const quotes = [
+      "The quick brown fox jumps over the lazy dog.",
+      "Typing tests help improve your speed and accuracy.",
+      "Practice makes perfect, so keep on typing!",
+      "Stay focused and type as fast as you can.",
+      "Consistency is the key to mastering any skill.",
+      "Patience, persistence, and practice pay off."
+    ];
+
+    let currentQuote = "";
+    let startTime;
+    let interval;
+    let countdownTimer;
+    let totalTime = 60; // seconds for countdown mode
+
+    const quoteElement = document.getElementById('quote');
+    const inputElement = document.getElementById('input');
+    const timeElement = document.getElementById('time');
+    const accuracyElement = document.getElementById('accuracy');
+    const wpmElement = document.getElementById('wpm');
+    const countdownElement = document.getElementById('countdown');
+
+    function startTest() {
+      currentQuote = quotes[Math.floor(Math.random() * quotes.length)];
+      displayQuote();
+      inputElement.value = "";
+      inputElement.disabled = false;
+      inputElement.focus();
+      startTime = Date.now();
+      clearInterval(interval);
+      clearInterval(countdownTimer);
+      timeElement.textContent = "0";
+      countdownElement.textContent = `Time left: ${totalTime}s`;
+      interval = setInterval(updateStats, 1000);
+      countdownTimer = setInterval(updateCountdown, 1000);
+    }
+
+    function restartTest() {
+      clearInterval(interval);
+      clearInterval(countdownTimer);
+      inputElement.disabled = true;
+      quoteElement.innerHTML = "Press Start to begin...";
+      inputElement.value = "";
+      timeElement.textContent = "0";
+      accuracyElement.textContent = "100%";
+      wpmElement.textContent = "0";
+      countdownElement.textContent = "";
+    }
+
+    function updateCountdown() {
+      let elapsed = Math.floor((Date.now() - startTime) / 1000);
+      let remaining = totalTime - elapsed;
+      countdownElement.textContent = `Time left: ${remaining}s`;
+      if (remaining <= 0) {
+        clearInterval(countdownTimer);
+        clearInterval(interval);
+        inputElement.disabled = true;
+        countdownElement.textContent = "Time's up!";
+      }
+    }
+
+    function displayQuote() {
+      quoteElement.innerHTML = '';
+      for (let char of currentQuote) {
+        const span = document.createElement('span');
+        span.textContent = char;
+        quoteElement.appendChild(span);
+      }
+    }
+
+    function updateStats() {
+      const elapsedTime = (Date.now() - startTime) / 1000;
+      timeElement.textContent = Math.floor(elapsedTime);
+
+      const typedText = inputElement.value;
+      const quoteSpans = quoteElement.querySelectorAll('span');
+
+      let correctChars = 0;
+      for (let i = 0; i < quoteSpans.length; i++) {
+        const char = typedText[i];
+        if (char == null) {
+          quoteSpans[i].classList.remove('correct');
+          quoteSpans[i].classList.remove('incorrect');
+        } else if (char === quoteSpans[i].textContent) {
+          quoteSpans[i].classList.add('correct');
+          quoteSpans[i].classList.remove('incorrect');
+          correctChars++;
+        } else {
+          quoteSpans[i].classList.add('incorrect');
+          quoteSpans[i].classList.remove('correct');
+        }
+      }
+
+      const accuracy = typedText.length > 0 ? (correctChars / typedText.length) * 100 : 100;
+      accuracyElement.textContent = accuracy.toFixed(0) + "%";
+
+      const wordsTyped = typedText.trim().split(/\s+/).length;
+      const wpm = (wordsTyped / elapsedTime) * 60;
+      wpmElement.textContent = typedText.length > 0 ? Math.max(0, Math.floor(wpm)) : 0;
+
+      if (typedText === currentQuote) {
+        clearInterval(interval);
+        clearInterval(countdownTimer);
+        inputElement.disabled = true;
+        countdownElement.textContent = "Finished!";
+      }
+    }
+
+    inputElement.addEventListener('input', updateStats);
+  </script>
+
+</body>
+</html>
