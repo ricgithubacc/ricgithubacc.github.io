@@ -294,6 +294,51 @@ async function saveChatHistory(uid, history) {
   }
 }
 
+// --- single progress bar helper (global, used by both setups) ---
+function makeProgressBar() {
+  const host = document.getElementById("initProgress");
+  if (!host) return null;
+
+  // If already created, re-use (prevents duplicates)
+  let root = host.querySelector(".webllm-progress");
+  if (!root) {
+    host.innerHTML = `
+      <div class="webllm-progress">
+        <div class="track" role="progressbar" aria-label="Model download progress"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="fill" id="wlmFill" style="width:0%"></div>
+        </div>
+        <div class="label muted" id="wlmLabel" aria-live="polite" style="margin-top:6px; font-size:12px;">
+          Model: 0%
+        </div>
+      </div>`;
+  }
+
+  const label = host.querySelector("#wlmLabel");
+  const fill  = host.querySelector("#wlmFill");
+  const track = host.querySelector(".track");
+
+  return {
+    show(text = "Model: 0%") {
+      if (label) label.textContent = text;
+      if (fill)  fill.style.width = "0%";
+      if (track) track.setAttribute("aria-valuenow", "0");
+    },
+    set(pct, text) {
+      const p = Math.max(0, Math.min(100, pct|0));
+      if (fill)  fill.style.width = p + "%";
+      if (label) label.textContent = text ?? `Model: ${p}%`;
+      if (track) track.setAttribute("aria-valuenow", String(p));
+    },
+    done(text = "Model: 100% Ready") {
+      if (fill)  fill.style.width = "100%";
+      if (label) label.textContent = text;
+      if (track) track.setAttribute("aria-valuenow", "100");
+    },
+    error(text) { if (label) label.textContent = text; }
+  };
+}
+
 
 // Multi-model WebLLM setup: loads whichever model is selected in #modelSelect
 async function setupWebLLMMultiModel() {
@@ -306,9 +351,7 @@ async function setupWebLLMMultiModel() {
   if (!logEl || !inputEl || !sendBtn || !loadBtn || !progHost) return;
 
   setupModelSelector();
-
-  // single shared progress bar (uses your existing makeProgressBar())
-  const bar = (typeof makeProgressBar === "function") ? makeProgressBar() : null;
+    const bar = makeProgressBar();
 
   // one engine; reuse across model loads (terminate on switch)
   let engine = null;
@@ -336,28 +379,32 @@ async function setupWebLLMMultiModel() {
     setSavedModelKey(key);
     const model_id = pickModelIdFromKey(key);
 
-    loadBtn.classList.add("loading");
+        loadBtn.classList.add("loading");
     loadBtn.disabled = true;
     bar?.show("Model: 0%");
     if (active) active.textContent = "Loading… " + model_id;
 
-    if (engine && engine.getModelId && engine.getModelId() !== model_id) {
+    // Always terminate prior engine (simple + safe)
+    if (engine && engine.terminate) {
       try { await engine.terminate(); } catch {}
       engine = null;
     }
-    if (!engine) engine = new webllm.MLCEngine();
 
-    await engine.reload(model_id, {
-      onProgress: (p) => {
-        const pct = Math.round((p || 0) * 100);
-        bar?.set(pct, `Model: ${pct}%`);
+    // Create and load with progress
+    engine = await webllm.CreateMLCEngine(model_id, {
+      appConfig,
+      initProgressCallback: (p) => {
+        const pct = Math.round((p?.progress ?? 0) * 100);
+        bar?.set(pct, `Loading — ${pct}%`);
       }
     });
 
+    // Loaded
     bar?.done("Model: ready");
     if (active) active.textContent = `Active: ${model_id}`;
     loadBtn.classList.remove("loading");
     loadBtn.disabled = false;
+
 
     // send handler (idempotent)
     sendBtn.onclick = async () => {
