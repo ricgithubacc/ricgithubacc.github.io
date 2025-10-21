@@ -1,4 +1,3 @@
-// --- Firebase SDKs (ES modules) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth,
@@ -11,7 +10,6 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// Firestore (lite) – tiny bundle, perfect for saving small docs
 import {
     getFirestore,
     doc,
@@ -19,43 +17,31 @@ import {
     setDoc
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
 
-  
-
-// 1) FILL THESE FROM Firebase Console → Project settings → Web app
 const firebaseConfig = {
   apiKey: "AIzaSyC2c5wDZDSjJT_08vUyb6P6i0Ry2bGHTZk",
   authDomain: "webchatbot-df69c.firebaseapp.com",
-  projectId: "webchatbot-df69c", // if your real projectId is webchatbot-df69c, change it
+  projectId: "webchatbot-df69c", 
   appId: "1:400213955287:web:f8e3b8c1fc220a41ee5692",
 };
 
-// 2) Init + keep session across reloads
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);   // <-- MOVE here (after app)
+const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
-await setPersistence(auth, browserLocalPersistence);
-
-// Custom domain + app under /chatbot
-const REPO = "";            // not used for custom domain
-// ----- App lives under /chatbot -----
+const REPO = "";
 const BASE = "/chatbot/";
 
 function go(path) {
-  // go("app.html") -> /chatbot/app.html
   window.location.href = (BASE + path).replace(/\/{2,}/g, "/");
 }
 
 function here(file) {
-  // helps guards detect current page even for /chatbot
   const p = location.pathname;
   if (file === "index.html") return /\/chatbot\/?$/.test(p) || p.endsWith("/chatbot/index.html");
   return p.endsWith("/chatbot/" + file);
 }
 
-// Shared helpers for inline errors (works with your smart-field styles)
 const $ = (sel) => document.querySelector(sel);
 function setInlineError(which, msg) {
   const id = which === "email" ? "email" : "password";
@@ -91,26 +77,19 @@ function attachCommonFieldUX() {
   const pass  = document.getElementById("password");
   const toggle = document.getElementById("passwordToggle");
   if (!email || !pass) return;
-
   email.setAttribute("placeholder"," ");
   pass.setAttribute("placeholder"," ");
-
   email.addEventListener("input", () => setInlineError("email",""));
   pass.addEventListener("input",  () => setInlineError("password",""));
   email.addEventListener("blur",  () => { if (!email.value.trim()) setInlineError("email","Email address required"); });
   pass.addEventListener("blur",   () => { if (!pass.value) setInlineError("password","Password required"); });
 
-  // inside attachCommonFieldUX()
 toggle?.addEventListener("click", (e) => {
   e.preventDefault();
   const showing = pass.type !== "text";
   pass.type = showing ? "text" : "password";
-
-  // keep icon/state in sync with your CSS
   toggle.setAttribute("aria-pressed", String(showing));
   toggle.classList.toggle("toggle-active", showing);
-
-  // keep caret visible after type flip
   try { pass.focus({ preventScroll: true }); } catch (_) {}
   const v = pass.value; pass.value = ""; pass.value = v;
 }, { passive: false });
@@ -131,19 +110,13 @@ function showNeuralSuccess() {
   }, 300);
 }
 
-// ---------- Page-specific wiring ----------
-const page = document.body.dataset.page; // "login" | "signup" | "app"
+const page = document.body.dataset.page;
 
-// Redirect rules based on auth state
 onAuthStateChanged(auth, (user) => {
   if (page === "login" || page === "signup") {
-    // If already signed-in and we’re on auth pages, go to app
     if (user && !here("app.html")) go("app.html");
   } else if (page === "app") {
-    // If not signed-in, bounce to login
     if (!user && !here("index.html")) go("index.html");
-
-    // Fill account box (if present)
     const emailEl = document.getElementById("userEmail");
     const uidEl = document.getElementById("userUid");
     if (user) {
@@ -153,7 +126,6 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
-// LOGIN page: sign in submit
 if (page === "login") {
   attachCommonFieldUX();
   const form = document.getElementById("loginForm");
@@ -183,7 +155,6 @@ if (page === "login") {
   });
 }
 
-// SIGNUP page: create account submit
 if (page === "signup") {
   attachCommonFieldUX();
   const form = document.getElementById("signupForm");
@@ -213,7 +184,6 @@ if (page === "signup") {
   });
 }
 
-// APP page: sign out
 if (page === "app") {
   document.getElementById("signOutBtn")?.addEventListener("click", async () => {
     await signOut(auth);
@@ -221,24 +191,13 @@ if (page === "app") {
   });
 }
 
-// ---------------- WebLLM Chat (app page, single-model) ----------------
-// ---------------- WebLLM Chat (app page, single-model, auto-resolve) ----------------
-// ---------------- WebLLM Chat (app page only, dynamic import) ----------------
 if (document.body.dataset.page === "app") {
   (async () => {
-    // Load the library only on app.html so login/signup never crash if CDN hiccups
     const webllm = await import("https://esm.run/@mlc-ai/web-llm@0.2.48");
-
-    // Use the official prebuilt config so WebLLM knows about its built-in models
     const appConfig = webllm.prebuiltAppConfig;
-
-    // Pick your light model here (keep your current choice)
     const MODEL_ID = "TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC";
-
-    // ---- Chat persistence helpers (reuse your Firestore + auth from above) ----
     const CHAT_COLLECTION = "chats";
-    const CHAT_DOC = "main";   // single ongoing thread per user
-
+    const CHAT_DOC = "main";
     async function loadChatHistory(uid) {
       try {
         const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
@@ -264,19 +223,15 @@ if (document.body.dataset.page === "app") {
       }
     }
 
-    // ---- WebLLM UI wiring (unchanged from your version) ----
     async function setupWebLLMChat() {
       const logEl = document.getElementById("chatLog");
       const inputEl = document.getElementById("chatInput");
       const sendBtn = document.getElementById("sendMsgBtn");
       const loadBtn = document.getElementById("loadModelBtn");
       const progEl  = document.getElementById("initProgress");
-      if (!logEl || !inputEl || !sendBtn || !loadBtn) return; // not on app.html
-
+      if (!logEl || !inputEl || !sendBtn || !loadBtn) return;
       let engine = null;
       const chatHistory = [{ role: "system", content: "You are a concise, helpful assistant." }];
-
-      // Load existing messages for this signed-in user (if any) and render them
       const user = auth.currentUser;
       if (user) {
         const saved = await loadChatHistory(user.uid);
@@ -299,12 +254,10 @@ if (document.body.dataset.page === "app") {
         logEl.scrollTop = logEl.scrollHeight;
       }
 
-      // --- single progress bar helper (only here, once) ---
       function makeProgressBar() {
         const host = document.getElementById("initProgress");
         if (!host) return null;
 
-        // If already created, re-use (prevents duplicates)
         let root = host.querySelector(".webllm-progress");
         if (!root) {
           host.innerHTML = `
@@ -360,8 +313,6 @@ if (document.body.dataset.page === "app") {
         loadBtn.disabled = yes;
         sendBtn.classList.toggle("loading", yes);
       }
-
-      // --- SINGLE click handler (keep only this one) ---
       loadBtn.addEventListener("click", async () => {
         if (engine) { bar?.done(`Model already loaded: ${MODEL_ID}`); return; }
         bar?.show("Downloading model… 0%");
@@ -440,7 +391,6 @@ if (document.body.dataset.page === "app") {
       });
     }
 
-    // Initialize on the app page
     await setupWebLLMChat();
   })().catch(err => {
     console.error("WebLLM init failed:", err);

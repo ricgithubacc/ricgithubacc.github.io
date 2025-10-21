@@ -7,19 +7,16 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body data-page="signup">
-  <!-- Shared neural background -->
   <div class="neural-background">
     <div class="neural-node"></div><div class="neural-node"></div>
     <div class="neural-node"></div><div class="neural-node"></div>
     <div class="neural-node"></div>
   </div>
 
-  <!-- Centered shell (matches app/index) -->
   <div class="login-container" style="max-width:520px;">
     <div class="login-card" style="padding:18px 18px 22px; position:relative;">
       <div class="ai-glow" aria-hidden="true"></div>
 
-      <!-- Header (same logo block) -->
       <div class="login-header" style="margin-bottom:14px;">
         <div class="ai-logo">
           <div class="logo-core">
@@ -39,7 +36,6 @@
         <p>Sign up to get started</p>
       </div>
 
-      <!-- Sign Up form (IDs preserved for script.js) -->
       <form class="login-form" id="signupForm" novalidate>
         <div class="smart-field">
           <label for="email">Email</label>
@@ -62,11 +58,7 @@
           <div class="button-glow"></div>
         </button>
       </form>
-
-      <!-- Success state placeholder (script.js toggles this) -->
       <div id="successMessage" class="muted" style="display:none; margin-top:12px;">Account created! Redirecting…</div>
-
-      <!-- Footer links -->
       <div class="signup-section" style="margin-top:16px; text-align:center;">
         <p class="muted" style="font-size:12px;">
           Already have an account?
@@ -91,7 +83,6 @@
   <script src="script.js" type="module"></script>
 
   <script>
-/* Eye toggle fallback (runs even if module fails) */
 (function () {
   function wireEye(root) {
     var eye = root.getElementById('passwordToggle');
@@ -104,7 +95,6 @@
       pwd.type = show ? 'text' : 'password';
       eye.setAttribute('aria-pressed', String(show));
       try { pwd.focus({ preventScroll: true }); } catch (_) {}
-      // caret visibility fix
       var v = pwd.value; pwd.value = ''; pwd.value = v;
     }, { passive: false });
   }
@@ -117,7 +107,6 @@
 </script>
 
 
-  <!-- Local tweaks to mirror app.html look & spacing -->
   <style>
     html, body { height:auto; min-height:100%; overflow-y:auto; }
     body { overscroll-behavior-y:contain; }

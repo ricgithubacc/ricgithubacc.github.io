@@ -7,19 +7,16 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body data-page="app">
-  <!-- Shared neural background (matches index/signup) -->
   <div class="neural-background">
     <div class="neural-node"></div><div class="neural-node"></div>
     <div class="neural-node"></div><div class="neural-node"></div>
     <div class="neural-node"></div>
   </div>
 
-  <!-- Centered shell like login/signup, but roomy enough for two cards -->
   <div class="login-container" style="max-width:1120px;">
     <div class="login-card" style="padding:18px 18px 22px;">
       <div class="ai-glow"></div>
 
-      <!-- Header matches index/signup -->
       <div class="login-header" style="margin-bottom:14px;">
         <div class="ai-logo">
           <div class="logo-core">
@@ -38,8 +35,6 @@
         <h1>Welcome</h1>
         <p>Chat with your on-device model</p>
       </div>
-
-      <!-- Top right action (same button style as auth pages) -->
       <div class="row" style="justify-content:flex-end; margin-bottom:16px;">
         <button id="signOutBtn" class="neural-button signout-big" title="Sign out">
           <div class="button-bg"></div>
@@ -55,26 +50,19 @@
         </button>
       </div>
 
-      <!-- Two-column content, styled to feel like two “login-card” halves -->
       <div class="section-grid" style="display:grid; grid-template-columns:1fr 1.6fr; gap:28px;">
-        <!-- Account card (left) -->
         <section class="info-card glass-card" style="position:relative; padding:16px 16px 18px;">
           <div class="ai-glow" aria-hidden="true"></div>
           <strong id="accountTitle" style="display:block; margin-bottom:8px;">Account</strong>
           <div class="muted" style="margin-top:6px;">Email: <span id="userEmail">(loading…)</span></div>
-          <!-- Keep UID node for safety but hidden -->
           <div style="display:none;">UID: <span id="userUid"></span></div>
-
           <div class="spacer" style="height:12px;"></div>
-
-          <!-- Load AI + progress host (script.js renders the bar + “Model:” under it) -->
           <div class="row" style="gap:12px; align-items:center; flex-wrap:wrap;">
             <button id="loadModelBtn" class="neural-button" style="min-height:42px;" title="Download and initialize the on-device model">
               <div class="button-bg"></div>
               <span class="button-text">Load AI</span>
               <div class="button-glow"></div>
             </button>
-
             <div class="progress-wrap" style="min-width:260px; flex:1; max-width:600px;">
               <div id="initProgress"></div>
             </div>
@@ -82,20 +70,15 @@
 
 
         </section>
-
-        <!-- Chat card (right) -->
         <section class="info-card glass-card" aria-labelledby="chatTitle" style="position:relative; padding:16px 16px 18px; display:flex; flex-direction:column;">
           <div class="ai-glow" aria-hidden="true"></div>
           <div class="row" style="justify-content:space-between; align-items:center;">
             <strong id="chatTitle">Chatbot</strong>
           </div>
-
-          <!-- History (same rounded/glass language as auth inputs/buttons) -->
           <div id="chatLog" aria-live="polite" aria-label="Chat history"
                style="margin-top:12px; height:clamp(260px, 40vh, 420px); overflow:auto; padding:12px; border-radius:16px; background:rgba(255,255,255,.03); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);">
           </div>
 
-          <!-- Composer: textarea full width ABOVE send (mirrors tidy, rounded inputs) -->
           <div class="stack" style="margin-top:12px; gap:10px;">
             <label for="chatInput" class="visually-hidden">Message</label>
             <textarea id="chatInput" rows="3" placeholder="Type your message…"
@@ -111,30 +94,22 @@
           </div>
         </section>
       </div>
-
-      <!-- Subtle footer like auth pages -->
       <div style="margin-top:24px; text-align:center;">
-        <p class="muted" style="font-size:12px;">Signed in? You can always sign out using the button at the top of the screen.</p>
+        <p class="muted" style="font-size:12px;">Signed in? You can always sign out using the button at the top of the.</p>
       </div>
     </div>
   </div>
 
-  <!-- Load your JS as a module so Firebase imports work -->
   <script src="script.js" type="module"></script>
 
-  <!-- Small local tweaks to align with auth pages -->
   <style>
-    /* Ensure scroll at 100% zoom */
     html, body { height:auto; min-height:100%; overflow-y:auto; }
     body { overscroll-behavior-y:contain; }
-
-    /* Match spacing language from auth screens */
     .section-grid { gap:28px !important; }
     @media (max-width: 980px) {
       .section-grid { grid-template-columns:1fr; }
     }
 
-    /* Glass cards mimic login-card internals */
     .glass-card {
       border:0;
       border-radius:22px;
@@ -146,7 +121,6 @@
       -webkit-backdrop-filter: blur(10px) saturate(130%);
     }
 
-    /* Buttons match the neural style used on index/signup */
     .signout-big {
       min-width:160px; min-height:50px; padding:10px 18px;
       font-size:16px; font-weight:600; border-radius:16px;
@@ -170,7 +144,6 @@
       box-shadow: 0 6px 16px rgba(0,0,0,.22), inset 0 0 0 1px rgba(255,255,255,.12);
     }
 
-    /* a11y helper (matches earlier pages) */
     .visually-hidden {
       position:absolute !important; height:1px; width:1px;
       overflow:hidden; clip:rect(1px,1px,1px,1px);
