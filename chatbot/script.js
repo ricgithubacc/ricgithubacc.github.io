@@ -223,43 +223,49 @@ const appConfig = webllm.prebuiltAppConfig;
  * 2) Try partial match containing "llama-3.2-1b-instruct".
  * 3) Fall back to the first model in the list.
  */
-function resolveModelId(preferredExact, preferredHint) {
+// Accept only these "light" model ids (update to match your build list exactly)
+const LIGHT_MODEL_IDS = new Set([
+  "Phi-3-mini-4k-instruct-q4f16_1-MLC",
+  "Llama-3.2-1B-Instruct-q4f16_1-MLC",
+  "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
+  // If your build has 1k-context variants, they’re even smaller:
+  // "Llama-3.2-1B-Instruct-q4f16_1-MLC-1k",
+  // "Qwen2.5-0.5B-Instruct-q4f16_1-MLC-1k",
+]);
+
+function resolveLightModelId(preferredExact, preferredHint) {
   const list = (appConfig?.model_list ?? []);
   if (!Array.isArray(list) || list.length === 0) {
-    throw new Error("WebLLM prebuilt appConfig contains no models.");
+    throw new Error("No models found in WebLLM appConfig.");
   }
-  const exact = list.find(m => m?.model_id === preferredExact);
+  // exact match, but only if it’s whitelisted
+  const exact = list.find(m => m?.model_id === preferredExact && LIGHT_MODEL_IDS.has(m.model_id));
   if (exact) return exact.model_id;
 
+  // partial match, but only within the whitelist
   const hintLower = (preferredHint || "").toLowerCase();
-  const partial = list.find(m => String(m?.model_id).toLowerCase().includes(hintLower));
-  return (partial ?? list[0]).model_id;
-}
+  const partial = list.find(m =>
+    LIGHT_MODEL_IDS.has(m?.model_id) &&
+    String(m?.model_id).toLowerCase().includes(hintLower)
+  );
+  if (partial) return partial.model_id;
 
-// --- Lightweight model catalog & helpers ---
-const MODEL_CATALOG = [
-  { key: "phi3",   label: "Phi-3 mini 4k (light)",          exact: "Phi-3-mini-4k-instruct-q4f16_1-MLC", hint: "phi-3-mini-4k-instruct" },
-  { key: "llama1b",label: "Llama-3.2-1B-Instruct (light)",   exact: "Llama-3.2-1B-Instruct-q4f16_1-MLC",  hint: "llama-3.2-1b-instruct" },
-  { key: "qwen05b",label: "Qwen-2.5-0.5B-Instruct (ultra-light)", exact: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC", hint: "qwen2.5-0.5b-instruct" }
-];
-
-function getSavedModelKey() {
-  try { return localStorage.getItem("webllm:modelKey") || "phi3"; } catch { return "phi3"; }
-}
-function setSavedModelKey(k) {
-  try { localStorage.setItem("webllm:modelKey", k); } catch {}
+  // No “fallback to first” — fail fast instead of loading an 8B model
+  throw new Error(`Lightweight model not bundled: ${preferredExact}`);
 }
 
 function pickModelIdFromKey(key) {
   const entry = MODEL_CATALOG.find(m => m.key === key) || MODEL_CATALOG[0];
-  return resolveModelId(entry.exact, entry.hint);
+  return resolveLightModelId(entry.exact, entry.hint);
 }
+
 
 function setupModelSelector() {
   const sel = document.getElementById("modelSelect");
   if (!sel) return;
   const saved = getSavedModelKey();
-  if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+
   sel.addEventListener("change", () => setSavedModelKey(sel.value));
 }
 
@@ -391,13 +397,14 @@ async function setupWebLLMMultiModel() {
     }
 
     // Create and load with progress
-    engine = await webllm.CreateMLCEngine(model_id, {
-      appConfig,
-      initProgressCallback: (p) => {
-        const pct = Math.round((p?.progress ?? 0) * 100);
-        bar?.set(pct, `Loading — ${pct}%`);
-      }
-    });
+engine = await webllm.CreateMLCEngine(model_id, {
+  appConfig,
+  initProgressCallback: (p) => {
+    const pct = Math.round((p?.progress ?? 0) * 100);
+    bar?.set(pct, `Loading — ${pct}%`);
+  }
+});
+
 
     // Loaded
     bar?.done("Model: ready");
