@@ -269,7 +269,7 @@ async function saveChatHistory(uid, history) {
 
 
 // Ask WebLLM which ID exists in THIS build
-const MODEL_ID = "Phi-3-mini-4k-instruct-q4f16_1-MLC";
+const MODEL_ID = "TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC";
 
 
   async function setupWebLLMChat() {
