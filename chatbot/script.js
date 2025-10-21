@@ -36,6 +36,53 @@ const auth = getAuth(app);
 const db = getFirestore(app);   // <-- MOVE here (after app)
 await setPersistence(auth, browserLocalPersistence);
 
+// --- Chat history persistence (Firestore + localStorage fallback) ---
+function lsKey(uid){ return `chat:history:${uid}`; }
+function saveChatHistoryLocal(uid, history) {
+  try { localStorage.setItem(lsKey(uid), JSON.stringify(history)); } catch {}
+}
+function loadChatHistoryLocal(uid) {
+  try { return JSON.parse(localStorage.getItem(lsKey(uid)) || "[]"); } catch { return []; }
+}
+
+const CHAT_COLLECTION = "chats";
+const CHAT_DOC = "main";
+
+async function loadChatHistory(uid) {
+  // 1) Try Firestore
+  try {
+    const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data();
+      const hist = Array.isArray(data?.history) ? data.history : [];
+      saveChatHistoryLocal(uid, hist); // cache
+      return hist;
+    }
+  } catch (e) {
+    console.warn("[chat] load (cloud) error:", e);
+  }
+  // 2) Fallback to local cache
+  return loadChatHistoryLocal(uid);
+}
+
+async function saveChatHistory(uid, history) {
+  const MAX_MSGS = 200;
+  const trimmed = history.slice(-MAX_MSGS);
+
+  // Always save locally
+  saveChatHistoryLocal(uid, trimmed);
+
+  // Best-effort cloud write
+  try {
+    const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
+    await setDoc(ref, { history: trimmed }, { merge: true });
+  } catch (e) {
+    console.warn("[chat] save (cloud) error:", e);
+  }
+}
+
+
 // Custom domain + app under /chatbot
 const REPO = "";            // not used for custom domain
 // ----- App lives under /chatbot -----
@@ -320,7 +367,8 @@ function makeProgressBar() {
 }
 
 // --- Chat wiring (app page only) ---
-async function setupWebLLMChat() {
+async function setupWebLLMChat(user) {
+
   if (document.body.dataset.page !== "app") return;
 
   const logEl   = document.getElementById("chatLog");
@@ -344,6 +392,14 @@ async function setupWebLLMChat() {
 
   let engine = null;
   const chatHistory = [{ role: "system", content: "You are a concise, friendly assistant." }];
+    const uid = user?.uid;
+  // Load previous turns (if any) and append after the system message
+  try {
+    const saved = uid ? await loadChatHistory(uid) : [];
+    for (const m of saved) if (m?.role && m.role !== "system") chatHistory.push(m);
+  } catch (e) {
+    console.warn("[chat] restore error:", e);
+  }
 
   // Load model when user clicks the button
   loadBtn?.addEventListener("click", async () => {
@@ -406,6 +462,10 @@ async function setupWebLLMChat() {
       logEl.scrollTop = logEl.scrollHeight;
     }
     chatHistory.push({ role: "assistant", content: assistantText });
+        if (assistantText && user?.uid) {
+      saveChatHistory(user.uid, chatHistory);
+    }
+
   }
 
   sendBtn?.addEventListener("click", sendMessage);
@@ -418,4 +478,14 @@ async function setupWebLLMChat() {
 }
 
 // Boot the chat on app page
-setupWebLLMChat();
+// Boot the chat on app page *after* auth resolves, so we know the UID
+if (document.body.dataset.page === "app") {
+  onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      go("index.html");
+      return;
+    }
+    setupWebLLMChat(user); // pass user for history load/save
+  });
+}
+
