@@ -68,7 +68,16 @@
           <div class="spacer" style="height:12px;"></div>
 
           <!-- Load AI + progress host (script.js renders the bar + “Model:” under it) -->
-          <div class="row" style="gap:12px; align-items:center; flex-wrap:wrap;">
+<div class="row" style="gap:12px; align-items:center; flex-wrap:wrap;">
+  <!-- NEW: super-lightweight model selector -->
+  <label for="modelSelect" class="muted" style="font-size:12px;">Model</label>
+<select id="modelSelect" style="min-height:42px; border-radius:10px; padding:8px 10px;">
+  <option value="phi3" selected>Phi-3 mini 4k (light)</option>
+  <option value="llama1b">Llama-3.2-1B-Instruct (light)</option>
+  <option value="qwen05b">Qwen-2.5-0.5B-Instruct (ultra-light)</option>
+</select>
+
+
   <button id="loadModelBtn" class="neural-button" style="min-height:42px;" title="Download and initialize the on-device model">
     <div class="button-bg"></div>
     <span class="button-text">Load AI</span>
@@ -79,18 +88,7 @@
     <div id="initProgress"></div>
     <div id="activeModelLabel" class="muted" style="margin-top:6px; font-size:12px;"></div>
   </div>
-
-  <!-- New: lightweight model selector -->
-  <label for="modelSelect" class="visually-hidden">Model</label>
-  <select id="modelSelect" style="
-      min-width:200px; height:42px; border-radius:12px; padding:0 12px;
-      background:rgba(255,255,255,.06); color:inherit; border:0;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
-  " title="Choose a smaller, cheaper model">
-    <!-- options are filled by script.js at runtime from WebLLM’s catalog -->
-  </select>
 </div>
-
 
 
         </section>

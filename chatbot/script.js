@@ -36,52 +36,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);   // <-- MOVE here (after app)
 await setPersistence(auth, browserLocalPersistence);
 
-// --- Chat history persistence (Firestore + localStorage fallback) ---
-function lsKey(uid){ return `chat:history:${uid}`; }
-function saveChatHistoryLocal(uid, history) {
-  try { localStorage.setItem(lsKey(uid), JSON.stringify(history)); } catch {}
-}
-function loadChatHistoryLocal(uid) {
-  try { return JSON.parse(localStorage.getItem(lsKey(uid)) || "[]"); } catch { return []; }
-}
-
-const CHAT_COLLECTION = "chats";
-const CHAT_DOC = "main";
-
-async function loadChatHistory(uid) {
-  // 1) Try Firestore
-  try {
-    const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      const data = snap.data();
-      const hist = Array.isArray(data?.history) ? data.history : [];
-      saveChatHistoryLocal(uid, hist); // cache
-      return hist;
-    }
-  } catch (e) {
-    console.warn("[chat] load (cloud) error:", e);
-  }
-  // 2) Fallback to local cache
-  return loadChatHistoryLocal(uid);
-}
-
-async function saveChatHistory(uid, history) {
-  const MAX_MSGS = 200;
-  const trimmed = history.slice(-MAX_MSGS);
-
-  // Always save locally
-  saveChatHistoryLocal(uid, trimmed);
-
-  // Best-effort cloud write
-  try {
-    const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
-    await setDoc(ref, { history: trimmed }, { merge: true });
-  } catch (e) {
-    console.warn("[chat] save (cloud) error:", e);
-  }
-}
-
+await setPersistence(auth, browserLocalPersistence);
 
 // Custom domain + app under /chatbot
 const REPO = "";            // not used for custom domain
@@ -256,236 +211,218 @@ if (page === "app") {
   });
 }
 
-// ---------------- WebLLM Chat (app page, single-model) ----------------
-// ---------------- WebLLM Chat with model selector ----------------
+// ---------------- WebLLM Chat (app page, single-model, auto-resolve) ----------------
 import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.48";
+
+// Use the official prebuilt config so WebLLM knows about its built-in models
 const appConfig = webllm.prebuiltAppConfig;
 
-// Friendly presets. We resolve each to an actual model_id available in this build.
-const MODEL_PRESETS = [
-  {
-    key: "phi3-mini",
-    label: "Phi-3 Mini (4K) – balanced",
-    exact: "Phi-3-mini-4k-instruct-q4f16_1-MLC",
-    hint:  "phi-3-mini-4k"
-  },
-  {
-    key: "llama-1b",
-    label: "Llama 3.2 1B – very light",
-    exact: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
-    hint:  "llama-3.2-1b"
-  },
-  {
-    key: "qwen-0.5b",
-    label: "Qwen2.5 0.5B – ultra light",
-    exact: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
-    hint:  "qwen2.5-0.5b"
-  }
-];
-
-/** Return a valid model_id from appConfig.model_list given desired exact/hint. */
+/**
+ * Pick a supported model ID from appConfig.model_list.
+ * 1) Try exact match (the one you want).
+ * 2) Try partial match containing "llama-3.2-1b-instruct".
+ * 3) Fall back to the first model in the list.
+ */
 function resolveModelId(preferredExact, preferredHint) {
-  const list = appConfig?.model_list ?? [];
+  const list = (appConfig?.model_list ?? []);
   if (!Array.isArray(list) || list.length === 0) {
     throw new Error("WebLLM prebuilt appConfig contains no models.");
   }
   const exact = list.find(m => m?.model_id === preferredExact);
   if (exact) return exact.model_id;
-  const hint = (preferredHint || "").toLowerCase();
-  const partial = list.find(m => String(m?.model_id).toLowerCase().includes(hint));
+
+  const hintLower = (preferredHint || "").toLowerCase();
+  const partial = list.find(m => String(m?.model_id).toLowerCase().includes(hintLower));
   return (partial ?? list[0]).model_id;
 }
 
-// Build a resolved catalog once (maps preset.key -> {label, model_id})
-const RESOLVED = MODEL_PRESETS.map(p => ({
-  key: p.key,
-  label: p.label,
-  model_id: resolveModelId(p.exact, p.hint)
-}));
+// --- Lightweight model catalog & helpers ---
+const MODEL_CATALOG = [
+  { key: "phi3",   label: "Phi-3 mini 4k (light)",          exact: "Phi-3-mini-4k-instruct-q4f16_1-MLC", hint: "phi-3-mini-4k-instruct" },
+  { key: "llama1b",label: "Llama-3.2-1B-Instruct (light)",   exact: "Llama-3.2-1B-Instruct-q4f16_1-MLC",  hint: "llama-3.2-1b-instruct" },
+  { key: "qwen05b",label: "Qwen-2.5-0.5B-Instruct (ultra-light)", exact: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC", hint: "qwen2.5-0.5b-instruct" }
+];
 
 function getSavedModelKey() {
-  return localStorage.getItem("wlm:modelKey") || "phi3-mini";
+  try { return localStorage.getItem("webllm:modelKey") || "phi3"; } catch { return "phi3"; }
 }
-function saveModelKey(key) {
-  localStorage.setItem("wlm:modelKey", key);
-}
-function getModelByKey(key) {
-  return RESOLVED.find(x => x.key === key) || RESOLVED[0];
+function setSavedModelKey(k) {
+  try { localStorage.setItem("webllm:modelKey", k); } catch {}
 }
 
-function populateModelSelect(selectEl) {
-  if (!selectEl) return;
-  selectEl.innerHTML = "";
-  for (const m of RESOLVED) {
-    const opt = document.createElement("option");
-    opt.value = m.key;
-    opt.textContent = m.label;
-    selectEl.appendChild(opt);
-  }
-  selectEl.value = getSavedModelKey();
+function pickModelIdFromKey(key) {
+  const entry = MODEL_CATALOG.find(m => m.key === key) || MODEL_CATALOG[0];
+  return resolveModelId(entry.exact, entry.hint);
 }
 
-// --- Single progress bar helper (unchanged API; now also updates the label) ---
-function makeProgressBar() {
-  const host = document.getElementById("initProgress");
-  const activeLabel = document.getElementById("activeModelLabel");
-  if (!host) return null;
-
-  let root = host.querySelector(".webllm-progress");
-  if (!root) {
-    host.innerHTML = `
-      <div class="webllm-progress">
-        <div class="track" role="progressbar" aria-label="Model download progress"
-             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-          <div class="fill" id="wlmFill" style="width:0%"></div>
-        </div>
-        <div class="label muted" id="wlmLabel" aria-live="polite" style="margin-top:6px; font-size:12px;">
-          Model: 0%
-        </div>
-      </div>`;
-  }
-  const label = host.querySelector("#wlmLabel");
-  const fill  = host.querySelector("#wlmFill");
-  const track = host.querySelector(".track");
-
-  return {
-    show(text = "Model: 0%") {
-      if (label) label.textContent = text;
-      if (fill)  fill.style.width = "0%";
-      if (track) track.setAttribute("aria-valuenow", "0");
-    },
-    set(pct, text) {
-      const p = Math.max(0, Math.min(100, pct|0));
-      if (fill)  fill.style.width = p + "%";
-      if (label) label.textContent = text ?? `Model: ${p}%`;
-      if (track) track.setAttribute("aria-valuenow", String(p));
-    },
-    setActiveModelName(name) {
-      if (activeLabel) activeLabel.textContent = name ? `Model: ${name}` : "";
-    }
-  };
+function setupModelSelector() {
+  const sel = document.getElementById("modelSelect");
+  if (!sel) return;
+  const saved = getSavedModelKey();
+  if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+  sel.addEventListener("change", () => setSavedModelKey(sel.value));
 }
 
-// --- Chat wiring (app page only) ---
-async function setupWebLLMChat(user) {
 
-  if (document.body.dataset.page !== "app") return;
+// --- Chat persistence helpers (per authenticated user) ---
+const CHAT_COLLECTION = "chats";
+const CHAT_DOC = "main";   // single ongoing thread per user (rename if you want multiple)
 
-  const logEl   = document.getElementById("chatLog");
-  const inputEl = document.getElementById("chatInput");
-  const sendBtn = document.getElementById("sendMsgBtn");
-  const loadBtn = document.getElementById("loadModelBtn");
-  const modelSel= document.getElementById("modelSelect");
-  const prog    = makeProgressBar();
-
-  // Fill selector and remember choice
-  populateModelSelect(modelSel);
-  modelSel?.addEventListener("change", () => {
-    saveModelKey(modelSel.value);
-    const m = getModelByKey(modelSel.value);
-    prog?.setActiveModelName(m.label);
-  });
-
-  // Show the current choice under the bar
-  const current = getModelByKey(getSavedModelKey());
-  prog?.setActiveModelName(current.label);
-
-  let engine = null;
-  const chatHistory = [{ role: "system", content: "You are a concise, friendly assistant." }];
-    const uid = user?.uid;
-  // Load previous turns (if any) and append after the system message
+async function loadChatHistory(uid) {
   try {
-    const saved = uid ? await loadChatHistory(uid) : [];
-    for (const m of saved) if (m?.role && m.role !== "system") chatHistory.push(m);
+    const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data();
+      return Array.isArray(data?.history) ? data.history : [];
+    }
   } catch (e) {
-    console.warn("[chat] restore error:", e);
+    console.warn("[chat] load error:", e);
+  }
+  return [];
+}
+
+async function saveChatHistory(uid, history) {
+  // Store up to N most recent messages to keep the doc small
+  const MAX_MSGS = 200;
+  const trimmed = history.slice(-MAX_MSGS);
+  try {
+    const ref = doc(db, "users", uid, CHAT_COLLECTION, CHAT_DOC);
+    await setDoc(ref, { history: trimmed }, { merge: true });
+  } catch (e) {
+    console.warn("[chat] save error:", e);
+  }
+}
+
+
+// Multi-model WebLLM setup: loads whichever model is selected in #modelSelect
+async function setupWebLLMMultiModel() {
+  const logEl    = document.getElementById("chatLog");
+  const inputEl  = document.getElementById("chatInput");
+  const sendBtn  = document.getElementById("sendMsgBtn");
+  const loadBtn  = document.getElementById("loadModelBtn");
+  const progHost = document.getElementById("initProgress");
+  const active   = document.getElementById("activeModelLabel");
+  if (!logEl || !inputEl || !sendBtn || !loadBtn || !progHost) return;
+
+  setupModelSelector();
+
+  // single shared progress bar (uses your existing makeProgressBar())
+  const bar = (typeof makeProgressBar === "function") ? makeProgressBar() : null;
+
+  // one engine; reuse across model loads (terminate on switch)
+  let engine = null;
+  let chatHistory = [{ role: "system", content: "You are a concise, helpful assistant." }];
+
+  // restore per-user chat history if available
+  const user = auth.currentUser;
+  if (user) {
+    const saved = await loadChatHistory(user.uid);
+    for (const m of saved) if (m.role !== "system") chatHistory.push(m);
+    // render
+    for (const m of chatHistory) {
+      if (m.role === "system") continue;
+      const wrap = document.createElement("div");
+      wrap.style.margin = "8px 0";
+      if (m.role === "user")      wrap.innerHTML = `<div class="muted" style="font-size:12px">you</div><div>${m.content.replace(/</g,"&lt;")}</div>`;
+      if (m.role === "assistant") wrap.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div>${m.content.replace(/</g,"&lt;")}</div>`;
+      logEl.appendChild(wrap);
+    }
+    logEl.scrollTop = logEl.scrollHeight;
   }
 
-  // Load model when user clicks the button
-  loadBtn?.addEventListener("click", async () => {
-    const selected = getModelByKey(getSavedModelKey());
-    prog?.show("Model: 0%");
-    prog?.setActiveModelName(selected.label);
+  async function loadChosenModel() {
+    const key = (document.getElementById("modelSelect")?.value) || getSavedModelKey();
+    setSavedModelKey(key);
+    const model_id = pickModelIdFromKey(key);
 
-    const initProgressCallback = (report) => {
-      if (report.progress) {
-        const pct = Math.round(report.progress * 100);
-        prog?.set(pct, `Model: ${pct}%`);
-      } else if (report.text) {
-        prog?.set(undefined, report.text);
+    loadBtn.classList.add("loading");
+    loadBtn.disabled = true;
+    bar?.show("Model: 0%");
+    if (active) active.textContent = "Loading… " + model_id;
+
+    if (engine && engine.getModelId && engine.getModelId() !== model_id) {
+      try { await engine.terminate(); } catch {}
+      engine = null;
+    }
+    if (!engine) engine = new webllm.MLCEngine();
+
+    await engine.reload(model_id, {
+      onProgress: (p) => {
+        const pct = Math.round((p || 0) * 100);
+        bar?.set(pct, `Model: ${pct}%`);
       }
-    };
-
-    // Create/replace engine with the chosen model
-    engine = await webllm.CreateWebWorkerEngine(
-      new URL("https://esm.run/@mlc-ai/web-llm@0.2.48/dist/worker.js", import.meta.url),
-      {
-        appConfig,
-        initProgressCallback,
-        model_id: selected.model_id,
-      }
-    );
-
-    prog?.set(100, "Model: 100%");
-  });
-
-  async function sendMessage() {
-    const text = (inputEl?.value || "").trim();
-    if (!text || !engine) return;
-    inputEl.value = "";
-    chatHistory.push({ role: "user", content: text });
-
-    // render user bubble
-    const u = document.createElement("div");
-    u.style.margin = "8px 0";
-    u.innerHTML = `<div class="muted" style="font-size:12px">you</div><div>${text.replace(/</g,"&lt;")}</div>`;
-    logEl.appendChild(u);
-
-    // stream assistant
-    const a = document.createElement("div");
-    a.style.margin = "8px 0";
-    a.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div></div>`;
-    const aBody = a.querySelector("div:last-child");
-    logEl.appendChild(a);
-    logEl.scrollTop = logEl.scrollHeight;
-
-    let assistantText = "";
-    const chunks = await engine.chat.completions.create({
-      stream: true,
-      messages: chatHistory
     });
 
-    for await (const chunk of chunks) {
-      const delta = chunk?.choices?.[0]?.delta?.content || "";
-      assistantText += delta;
-      aBody.textContent = assistantText;
-      logEl.scrollTop = logEl.scrollHeight;
-    }
-    chatHistory.push({ role: "assistant", content: assistantText });
-        if (assistantText && user?.uid) {
-      saveChatHistory(user.uid, chatHistory);
-    }
+    bar?.done("Model: ready");
+    if (active) active.textContent = `Active: ${model_id}`;
+    loadBtn.classList.remove("loading");
+    loadBtn.disabled = false;
 
+    // send handler (idempotent)
+    sendBtn.onclick = async () => {
+      const msg = (inputEl.value || "").trim();
+      if (!msg) return;
+      inputEl.value = "";
+
+      const u = document.createElement("div");
+      u.style.margin = "8px 0";
+      u.innerHTML = `<div class="muted" style="font-size:12px">you</div><div>${msg.replace(/</g,"&lt;")}</div>`;
+      logEl.appendChild(u);
+      logEl.scrollTop = logEl.scrollHeight;
+
+      chatHistory.push({ role: "user", content: msg });
+
+      const a = document.createElement("div");
+      a.style.margin = "8px 0";
+      a.innerHTML = `<div class="muted" style="font-size:12px">assistant</div><div></div>`;
+      const aBody = a.querySelector("div:last-child");
+      logEl.appendChild(a);
+
+      let out = "";
+      for await (const chunk of engine.chat.completions.create({
+        messages: chatHistory,
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 256
+      })) {
+        const delta = chunk?.choices?.[0]?.delta?.content || "";
+        out += delta;
+        aBody.textContent = out;
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      chatHistory.push({ role: "assistant", content: out });
+      if (auth.currentUser) {
+        saveChatHistory(auth.currentUser.uid, chatHistory);
+      }
+    };
   }
 
-  sendBtn?.addEventListener("click", sendMessage);
-  inputEl?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+  // Hook the Load AI button
+  loadBtn.addEventListener("click", () => {
+    loadChosenModel().catch(err => {
+      console.error("[webllm] load failed:", err);
+      bar?.done("Error");
+      loadBtn.classList.remove("loading");
+      loadBtn.disabled = false;
+      if (active) active.textContent = "Error loading model";
+    });
   });
+
+  // show which model is selected before load
+  const savedKey = getSavedModelKey();
+  if (active) {
+    const label = MODEL_CATALOG.find(m => m.key === savedKey)?.label || "Phi-3 mini 4k";
+    active.textContent = `Selected: ${label}`;
+  }
 }
 
-// Boot the chat on app page
-// Boot the chat on app page *after* auth resolves, so we know the UID
+// Initialize the chat only on the app page (after your auth guard)
 if (document.body.dataset.page === "app") {
-  onAuthStateChanged(auth, (user) => {
-    if (!user) {
-      go("index.html");
-      return;
-    }
-    setupWebLLMChat(user); // pass user for history load/save
-  });
+  // Optional: auto-load the model on page open:
+  // setupWebLLMChat().then(()=> document.getElementById("loadModelBtn")?.click());
+// Optional: auto-load the model on page open:
+// setupWebLLMMultiModel().then(()=> document.getElementById("loadModelBtn")?.click());
+  setupWebLLMMultiModel();
 }
-
