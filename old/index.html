@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Richard Tran | Portfolio</title>
+  <link rel="icon" type="image/x-icon" href="icon.png">
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Richard Tran | Portfolio</h1>
+    <button id="toggle-theme">🌓 Dark Mode</button>
+  </header>
+
+  <section>
+    <h2>About Me</h2>
+  </section>
+
+  <section>
+    <h2>Projects</h2>
+
+    <div class="project">
+      <h3>Blackjack Game</h3>
+    </div>
+
+  </section>
+
+  <section>
+    <h2>Certifications</h2>
+
+    <div class="certification">
+      <p>CompTIA ITF+ <span class="status">✓ Completed</span></p>
+      <div class="bar-wrapper">
+        <div class="tooltip">Completed: July 2022</div>
+        <div class="progress complete"></div>
+      </div>
+    </div>
+
+    <div class="certification">
+      <p>CompTIA Security+ <span class="status">⏳ In Progress</span></p>
+      <div class="bar-wrapper">
+        <div class="tooltip">Expected: June 2025</div>
+        <div class="progress in-progress"></div>
+      </div>
+    </div>
+
+    <div class="certification">
+      <p>CISSP <span class="status">🚧 Planned</span></p>
+      <div class="bar-wrapper">
+        <div class="tooltip">Goal: Late 2025</div>
+        <div class="progress future"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Contact</h2>
+    <p class="contact-info">Email: rictra@udel.edu</p>
+    <p class="contact-info">Phone: 302-670-2342</p>
+  </section>
+
+  <footer>
+    <p>&copy; 2025 Richard Tran. All rights reserved.</p>
+  </footer>
+
+  <script>
+    const toggleBtn = document.getElementById('toggle-theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedTheme = localStorage.getItem('theme');
+
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+      document.body.classList.add('dark-mode');
+      toggleBtn.textContent = '☀️ Light Mode';
+    }
+
+    toggleBtn.addEventListener('click', () => {
+      document.body.classList.toggle('dark-mode');
+      const isDark = document.body.classList.contains('dark-mode');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      toggleBtn.textContent = isDark ? '☀️ Light Mode' : '🌓 Dark Mode';
+    });
+  </script>
+</body>
+</html>

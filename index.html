@@ -1,85 +1,187 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Richard Tran | Portfolio</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <header>
-    <h1>Richard Tran | Portfolio</h1>
-    <button id="toggle-theme">🌓 Dark Mode</button>
-  </header>
+<!DOCTYPE HTML>
+<!--
+	Solid State by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>Richard Tran | Portfolio</title>
+		<link rel="icon" type="image/x-icon" href="images/icon.png">
 
-  <section>
-    <h2>About Me</h2>
-  </section>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+	</head>
+	<body class="is-preload">
 
-  <section>
-    <h2>Projects</h2>
+		<!-- Page Wrapper -->
+			<div id="page-wrapper">
 
-    <div class="project">
-      <h3>Blackjack Game</h3>
-    </div>
+				<!-- Header -->
+					<header id="header" class="alt">
+						<h1><a href="index.html">Home Page</a></h1>
+						<nav>
+							<a href="#menu">Menu</a>
+						</nav>
+					</header>
 
-  </section>
+				<!-- Menu -->
+					<nav id="menu">
+						<div class="inner">
+							<h2>Menu</h2>
+							<ul class="links">
+								<li><a href="index.html">Home</a></li>
+								<li><a href="generic.html">Generic</a></li>
+								<li><a href="elements.html">Elements</a></li>
+								<li><a href="#">Log In</a></li>
+								<li><a href="#">Sign Up</a></li>
+							</ul>
+							<a href="#" class="close">Close</a>
+						</div>
+					</nav>
 
-  <section>
-    <h2>Certifications</h2>
+				<!-- Banner -->
+					<section id="banner">
+					<video class="banner-video" autoplay muted loop playsinline preload="metadata">
+						<source src="images/intro.mp4" type="video/mp4">
+					</video>
 
-    <div class="certification">
-      <p>CompTIA ITF+ <span class="status">✓ Completed</span></p>
-      <div class="bar-wrapper">
-        <div class="tooltip">Completed: July 2022</div>
-        <div class="progress complete"></div>
-      </div>
-    </div>
+					<div class="inner">
+						<h2>I'm</h2>
+						<h1>Nice to meet you :D</h1>
+					</div>
+					</section>
 
-    <div class="certification">
-      <p>CompTIA Security+ <span class="status">⏳ In Progress</span></p>
-      <div class="bar-wrapper">
-        <div class="tooltip">Expected: June 2025</div>
-        <div class="progress in-progress"></div>
-      </div>
-    </div>
 
-    <div class="certification">
-      <p>CISSP <span class="status">🚧 Planned</span></p>
-      <div class="bar-wrapper">
-        <div class="tooltip">Goal: Late 2025</div>
-        <div class="progress future"></div>
-      </div>
-    </div>
-  </section>
+				<!-- Wrapper -->
+					<section id="wrapper">
 
-  <section>
-    <h2>Contact</h2>
-    <p class="contact-info">Email: rictra@udel.edu</p>
-    <p class="contact-info">Phone: 302-670-2342</p>
-  </section>
+						<!-- One -->
+							<section id="one" class="wrapper spotlight style">
+								<div class="inner">
+									<a href="#" class="image"><img src="images/pic01.jpg" alt="" /></a>
+									<div class="content">
+										<h2 class="major">About me</h2>
+										<p>test1</p>
+										<!-- <a href="#" class="special">Learn more</a> -->
+									</div>
+								</div>
+							</section>
 
-  <footer>
-    <p>&copy; 2025 Richard Tran. All rights reserved.</p>
-  </footer>
+						<!-- Two -->
+							<section id="two" class="wrapper alt spotlight style2">
+								<div class="inner">
+									<a href="#" class="image"><img src="images/pic02.jpg" alt="" /></a>
+									<div class="content">
+										<h2 class="major">Projects</h2>
+										<p>test2</p>
+										<!-- <a href="#" class="special">Learn more</a> -->
+									</div>
+								</div>
+							</section>
 
-  <script>
-    const toggleBtn = document.getElementById('toggle-theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const savedTheme = localStorage.getItem('theme');
+						<!-- Three -->
+							<section id="three" class="wrapper spotlight style3">
+								<div class="inner">
+									<a href="#" class="image"><img src="images/pic03.jpg" alt="" /></a>
+									<div class="content">
+										<h2 class="major">Certifications</h2>
+										<p>test3</p>
+										<!-- <a href="#" class="special">Learn more</a> -->
+									</div>
+								</div>
+							</section>
 
-    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-      document.body.classList.add('dark-mode');
-      toggleBtn.textContent = '☀️ Light Mode';
-    }
+						<!-- Four -->
+							<!-- <section id="four" class="wrapper alt style1">
+								<div class="inner">
+									<h2 class="major">Vitae phasellus</h2>
+									<p>Cras mattis ante fermentum, malesuada neque vitae, eleifend erat. Phasellus non pulvinar erat. Fusce tincidunt, nisl eget mattis egestas, purus ipsum consequat orci, sit amet lobortis lorem lacus in tellus. Sed ac elementum arcu. Quisque placerat auctor laoreet.</p>
+									<section class="features">
+										<article>
+											<a href="#" class="image"><img src="images/pic04.jpg" alt="" /></a>
+											<h3 class="major">Sed feugiat lorem</h3>
+											<p>Lorem ipsum dolor sit amet, consectetur adipiscing vehicula id nulla dignissim dapibus ultrices.</p>
+											<a href="#" class="special">Learn more</a>
+										</article>
+										<article>
+											<a href="#" class="image"><img src="images/pic05.jpg" alt="" /></a>
+											<h3 class="major">Nisl placerat</h3>
+											<p>Lorem ipsum dolor sit amet, consectetur adipiscing vehicula id nulla dignissim dapibus ultrices.</p>
+											<a href="#" class="special">Learn more</a>
+										</article>
+										<article>
+											<a href="#" class="image"><img src="images/pic06.jpg" alt="" /></a>
+											<h3 class="major">Ante fermentum</h3>
+											<p>Lorem ipsum dolor sit amet, consectetur adipiscing vehicula id nulla dignissim dapibus ultrices.</p>
+											<a href="#" class="special">Learn more</a>
+										</article>
+										<article>
+											<a href="#" class="image"><img src="images/pic07.jpg" alt="" /></a>
+											<h3 class="major">Fusce consequat</h3>
+											<p>Lorem ipsum dolor sit amet, consectetur adipiscing vehicula id nulla dignissim dapibus ultrices.</p>
+											<a href="#" class="special">Learn more</a>
+										</article>
+									</section>
+									<ul class="actions">
+										<li><a href="#" class="button">Browse All</a></li>
+									</ul>
+								</div>
+							</section> -->
 
-    toggleBtn.addEventListener('click', () => {
-      document.body.classList.toggle('dark-mode');
-      const isDark = document.body.classList.contains('dark-mode');
-      localStorage.setItem('theme', isDark ? 'dark' : 'light');
-      toggleBtn.textContent = isDark ? '☀️ Light Mode' : '🌓 Dark Mode';
-    });
-  </script>
-</body>
+					</section>
+
+				<!-- Footer -->
+					<section id="footer">
+						<div class="inner">
+							<h2 class="major">Contact Me!</h2>
+							<!-- <p>Cras mattis ante fermentum, malesuada neque vitae, eleifend erat. Phasellus non pulvinar erat. Fusce tincidunt, nisl eget mattis egestas, purus ipsum consequat orci, sit amet lobortis lorem lacus in tellus. Sed ac elementum arcu. Quisque placerat auctor laoreet.</p> -->
+							<!-- <form method="post" action="#">
+								<div class="fields">
+									<div class="field">
+										<label for="name">Name</label>
+										<input type="text" name="name" id="name" />
+									</div>
+									<div class="field">
+										<label for="email">Email</label>
+										<input type="email" name="email" id="email" />
+									</div>
+									<div class="field">
+										<label for="message">Message</label>
+										<textarea name="message" id="message" rows="4"></textarea>
+									</div>
+								</div>
+								<ul class="actions">
+									<li><input type="submit" value="Send Message" /></li>
+								</ul>
+							</form> -->
+							<ul class="contact">
+								<li class="icon solid fa-home">
+									Newark, Delaware
+								</li>
+								<li class="icon solid fa-phone">(302) 670-2342</li>
+								<li class="icon solid fa-envelope"><a href="#">rictra@udel.edu</a></li>
+								<!-- <li class="icon brands fa-twitter"><a href="#">twitter.com/untitled-tld</a></li>
+								<li class="icon brands fa-facebook-f"><a href="#">facebook.com/untitled-tld</a></li>
+								<li class="icon brands fa-instagram"><a href="#">instagram.com/untitled-tld</a></li> -->
+							</ul>
+							<ul class="copyright">
+								<li>&copy; 2026 Richard Tran. All rights reserved.</li><li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
+							</ul>
+						</div>
+					</section>
+
+			</div>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/jquery.scrollex.min.js"></script>
+			<script src="assets/js/browser.min.js"></script>
+			<script src="assets/js/breakpoints.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<script src="assets/js/main.js"></script>
+
+	</body>
 </html>
