@@ -3436,7 +3436,7 @@ input, select, textarea {
 /* Keep banner content above overlay/video */
 #banner .inner {
   text-align: left;
-  padding-left: 24rem;
+  padding-left: 18rem;
   padding-top: 10rem;
   position: relative;
   z-index: 2;
